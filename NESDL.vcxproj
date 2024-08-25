@@ -18,6 +18,27 @@
       <Platform>x64</Platform>
     </ProjectConfiguration>
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Source\include\NESDL.h" />
+    <ClInclude Include="Source\include\NESDL_APU.h" />
+    <ClInclude Include="Source\include\NESDL_Constants.h" />
+    <ClInclude Include="Source\include\NESDL_Core.h" />
+    <ClInclude Include="Source\include\NESDL_CPU.h" />
+    <ClInclude Include="Source\include\NESDL_Input.h" />
+    <ClInclude Include="Source\include\NESDL_PPU.h" />
+    <ClInclude Include="Source\include\NESDL_RAM.h" />
+    <ClInclude Include="Source\include\NESDL_SDL.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="Source\src\NESDL.cpp" />
+    <ClCompile Include="Source\src\NESDL_APU.cpp" />
+    <ClCompile Include="Source\src\NESDL_Core.cpp" />
+    <ClCompile Include="Source\src\NESDL_CPU.cpp" />
+    <ClCompile Include="Source\src\NESDL_Input.cpp" />
+    <ClCompile Include="Source\src\NESDL_PPU.cpp" />
+    <ClCompile Include="Source\src\NESDL_RAM.cpp" />
+    <ClCompile Include="Source\src\NESDL_SDL.cpp" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
@@ -71,12 +92,15 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>C:\vclib\SDL2-2.30.6\include;$(IncludePath)</IncludePath>
+    <IncludePath>$(ProjectDir)Source\include;C:\vclib\SDL2-2.30.6\include;$(IncludePath)</IncludePath>
     <LibraryPath>C:\vclib\SDL2-2.30.6\lib\x64;$(LibraryPath)</LibraryPath>
+    <SourcePath>$(ProjectDir)Source\src;$(SourcePath)</SourcePath>
+    <AllProjectIncludesArePublic>false</AllProjectIncludesArePublic>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IncludePath>C:\vclib\SDL2-2.30.6\include;$(IncludePath)</IncludePath>
+    <IncludePath>$(ProjectDir)Source\include;C:\vclib\SDL2-2.30.6\include;$(IncludePath)</IncludePath>
     <LibraryPath>C:\vclib\SDL2-2.30.6\lib\x64;$(LibraryPath)</LibraryPath>
+    <SourcePath>$(ProjectDir)Source\src;$(SourcePath)</SourcePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -136,9 +160,6 @@
       <AdditionalDependencies>SDL2.lib;SDL2main.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
-  <ItemGroup>
-    <ClCompile Include="main.cpp" />
-  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
