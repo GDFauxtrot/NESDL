@@ -25,6 +25,10 @@ class NESDL_CPU
 {
 public:
 	void Init();
+	void Update(double newSystemTime);
+	void RunNextInstruction();
 private:
+	NESDL_Core* core;
 	CPURegisters registers;
+	double elapsedTime;
 };

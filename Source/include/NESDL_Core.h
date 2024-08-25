@@ -25,5 +25,5 @@ public:
 	NESDL_RAM *ram;
 	NESDL_APU *apu;
 private:
-	
+	double timeSinceStartup;
 };

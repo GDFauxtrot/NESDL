@@ -9,11 +9,20 @@ void NESDL_Core::Init()
 	ppu = new NESDL_PPU();
 	ram = new NESDL_RAM();
 	apu = new NESDL_APU();
+
+	cpu->Init();
+
+	timeSinceStartup = 0;
 }
 
 void NESDL_Core::Update(double deltaTime)
 {
-	
+	// Convert deltaTime to the amount of cycles we need to advance on this frame
+	timeSinceStartup += deltaTime;
+
+	// Send current timeSinceStartup to CPU and PPU to handle their own cycle updates
+	cpu->Update(timeSinceStartup);
+	ppu->Update(timeSinceStartup);
 }
 
 void NESDL_Core::LoadRom(const char* path)

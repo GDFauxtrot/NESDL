@@ -40,9 +40,11 @@ int main(int argc, char* args[])
         currentPerf = SDL_GetPerformanceCounter();
         deltaTime = (double)((currentPerf - lastPerf) * 1000) / (double) freq;
 
+        //printf(to_string(deltaTime).c_str());
+        //printf("\n");
+
         // Send the deltaTime to the system to handle
         core.Update(deltaTime);
-
         // Update screen with whatever's meant to be displayed from the PPU
         //sdlCtx.UpdateScreen(core.ppu->pixels);
     }
