@@ -1,13 +1,13 @@
 #pragma once
 
-using namespace std; // evil
-
 //Using SDL and standard IO
-#include <SDL.h>
+#include <SDL2/SDL.h>
 #include <stdio.h>
 
 #include <string>
 #include <vector>
+#include <chrono>
+#include <thread>
 
 #include "NESDL_Constants.h"
 #include "NESDL_Input.h"

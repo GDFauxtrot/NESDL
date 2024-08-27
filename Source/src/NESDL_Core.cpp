@@ -10,7 +10,7 @@ void NESDL_Core::Init()
 	ram = new NESDL_RAM();
 	apu = new NESDL_APU();
 
-	cpu->Init();
+	cpu->Init(this);
 
 	timeSinceStartup = 0;
 }
@@ -56,4 +56,7 @@ void NESDL_Core::LoadRom(const char* path)
 	ram->WriteVROMData(vromData->data(), vromBankCount); // TODO abstract this to a mapper! Assuming NROM
 
 	file.close();
+    
+    // AGAIN! Use a mapper! This shit ain't gonna fly
+    cpu->registers.pc = 0x8000;
 }

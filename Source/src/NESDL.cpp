@@ -1,4 +1,5 @@
 #include "NESDL.h"
+#include <unistd.h>
 
 int main(int argc, char* args[])
 {
@@ -11,9 +12,15 @@ int main(int argc, char* args[])
     // Initialize system
     NESDL_Core core;
     core.Init();
+    
+    // SLEEP for a second while we boot up
+    this_thread::sleep_for(chrono::seconds(1));
 
     // Get ROM file (we hard coding this for now! Let's build a menu bar to load stuff later)
-    string romFile = "D:\\Projects\\NESDL\\x64\\Debug\\nestest.nes";
+    
+    string romFile = "nestest.nes";
+    
+    printf("%s", getcwd(NULL, 0));
 
     // Load ROM into core
     core.LoadRom(romFile.c_str());
@@ -21,6 +28,7 @@ int main(int argc, char* args[])
     // Begin game loop!
     SDL_Event e;
     bool coreIsRunning = true;
+    bool isFirstFrame = true;
     Uint64 currentPerf = SDL_GetPerformanceCounter();
     Uint64 lastPerf;
     double deltaTime; // in milliseconds
@@ -34,14 +42,18 @@ int main(int argc, char* args[])
                 coreIsRunning = false;
             }
         }
+        if (isFirstFrame)
+        {
+            isFirstFrame = false;
+            currentPerf = SDL_GetPerformanceCounter();
+        }
 
         // Advance the core by the amount of time taken this loop
         lastPerf = currentPerf;
         currentPerf = SDL_GetPerformanceCounter();
         deltaTime = (double)((currentPerf - lastPerf) * 1000) / (double) freq;
 
-        //printf(to_string(deltaTime).c_str());
-        //printf("\n");
+        printf("%f\n", deltaTime);
 
         // Send the deltaTime to the system to handle
         core.Update(deltaTime);
