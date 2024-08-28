@@ -24,6 +24,8 @@ int main(int argc, char* args[])
 
     // Load ROM into core
     core.LoadRom(romFile.c_str());
+    
+    core.StartSystem();
 
     // Begin game loop!
     SDL_Event e;

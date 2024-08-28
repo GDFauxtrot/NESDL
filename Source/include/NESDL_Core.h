@@ -17,6 +17,7 @@ class NESDL_Core
 {
 public:
 	void Init();
+    void StartSystem();
 	void Update(double deltaTime);
 	void LoadRom(const char* path);
 

@@ -5,14 +5,16 @@ void NESDL_CPU::Init(NESDL_Core* c)
 	elapsedCycles = 0;
     core = c;
     addrModeResult = new AddressModeResult();
-    
-    // Initial CPU register values
-    registers.a = 0;
-    registers.x = 0;
-    registers.y = 0;
-    registers.pc = 0xFFFC;
-    registers.sp = 0xFD;
-    registers.p = PSTATUS_INTERRUPTDISABLE;
+}
+
+void NESDL_CPU::Start()
+{
+    // CPU warms up for 7 cycles and fetches the true start address
+    // from 0xFFFC. Let's do the same here
+
+    InitializeCPURegisters();
+    registers.pc = core->ram->ReadWord(registers.pc);
+    elapsedCycles += 7;
 }
 
 void NESDL_CPU::Update(double newSystemTime)
@@ -28,6 +30,18 @@ void NESDL_CPU::Update(double newSystemTime)
 	{
 		RunNextInstruction();
 	}
+}
+
+void NESDL_CPU::InitializeCPURegisters()
+{
+    // Initialize registers with values measured from real-world hardware,
+    // assuming a hard reset.
+    registers.a = 0;
+    registers.x = 0;
+    registers.y = 0;
+    registers.pc = 0xFFFC;
+    registers.sp = 0xFD;
+    registers.p = PSTATUS_INTERRUPTDISABLE;
 }
 
 void NESDL_CPU::RunNextInstruction()

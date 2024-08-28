@@ -40,7 +40,9 @@ class NESDL_CPU
 {
 public:
 	void Init(NESDL_Core* c);
+    void Start();
 	void Update(double newSystemTime);
+    void InitializeCPURegisters();
 	void RunNextInstruction();
 	uint64_t MillisecondsToCPUCycles(double ms);
 	double CPUCyclesToMilliseconds(uint64_t c);
