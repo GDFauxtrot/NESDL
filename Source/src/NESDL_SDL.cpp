@@ -16,6 +16,7 @@ void NESDL_SDL::SDLInit()
         SDL_CreateWindowAndRenderer(NESDL_SCREEN_WIDTH, NESDL_SCREEN_HEIGHT,
             SDL_WINDOW_SHOWN, &window, &renderer);
         SDL_SetWindowTitle(window, NESDL_WINDOW_NAME.c_str());
+        SDL_SetWindowResizable(window, SDL_TRUE);
 
         if (window == NULL)
         {
@@ -43,4 +44,12 @@ void NESDL_SDL::SDLQuit()
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     SDL_Quit();
+}
+
+void NESDL_SDL::UpdateScreen(NESDL_PPU* ppu)
+{
+    SDL_UpdateTexture(texture, NULL, ppu->frameData, NESDL_SCREEN_WIDTH * sizeof(uint32_t));
+    SDL_RenderClear(renderer);
+    SDL_RenderCopy(renderer, texture, NULL, NULL);
+    SDL_RenderPresent(renderer);
 }

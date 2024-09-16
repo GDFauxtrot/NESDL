@@ -5,6 +5,7 @@ void NESDL_CPU::Init(NESDL_Core* c)
 	elapsedCycles = 0;
     core = c;
     addrModeResult = new AddressModeResult();
+    ppuCycleCounter = 0;
 }
 
 void NESDL_CPU::Start()
@@ -17,19 +18,28 @@ void NESDL_CPU::Start()
     elapsedCycles += 7;
 }
 
-void NESDL_CPU::Update(double newSystemTime)
+void NESDL_CPU::Update(uint32_t ppuCycles)
 {
-	// Take the new system time (milliseconds since boot) and compare to our own tracked time
-	// If the new system time is larger than the CPU's tracked time, then we're due for an instruction
-	// Else, wait out this update - we overshot the master clock with our last instruction so we must wait
-	uint64_t newCycles = MillisecondsToCPUCycles(newSystemTime);
-
-	// Run instructions to catch up with time
-    //if (newCycles > elapsedCycles)
-	while (newCycles > elapsedCycles)
-	{
-		RunNextInstruction();
-	}
+    // Get the next instruction to be run and wait that many cycles to complete it.
+    // We want to execute the instruction fully AFTER the alotted time for that instruction
+    // in order to leave room for the PPU to execute what it needs to properly
+    // (If we wanted perfect accurate emulation, we'd simulate waits on opcode reads and various
+    // actions on the hardware, but this method also seems to work well enough)
+    
+    // PPU cycle counter has set amount of cycles (normally 1) added to it every update.
+    // If the count >= 3, we're due for at least one CPU cycle update
+    
+    // Find out how long the next instruction will take.
+    // We delay execution until we've counted up to that value, reset the counter
+    // then run the instruction and evaluate the next instruction's time.
+    uint8_t nextInstructionPPUTime = GetCyclesForNextInstruction() * 3;
+    ppuCycleCounter += ppuCycles;
+    while (ppuCycleCounter > nextInstructionPPUTime)
+    {
+        ppuCycleCounter -= nextInstructionPPUTime;
+        RunNextInstruction();
+        nextInstructionPPUTime = GetCyclesForNextInstruction();
+    }
 }
 
 void NESDL_CPU::InitializeCPURegisters()
@@ -44,6 +54,22 @@ void NESDL_CPU::InitializeCPURegisters()
     registers.p = PSTATUS_INTERRUPTDISABLE;
 }
 
+uint8_t NESDL_CPU::GetCyclesForNextInstruction()
+{
+    // Run next instruction to see how long it'll take, then reset the CPU state
+    CPURegisters regState = registers;
+    uint64_t prevElapsedCycles = elapsedCycles;
+    core->ppu->ignoreChanges = true;
+    core->ram->ignoreChanges = true;
+    RunNextInstruction();
+    core->ppu->ignoreChanges = false;
+    core->ram->ignoreChanges = false;
+    registers = regState;
+    uint8_t result = elapsedCycles - prevElapsedCycles;
+    elapsedCycles = prevElapsedCycles;
+    return result;
+}
+
 void NESDL_CPU::RunNextInstruction()
 {
 	// Get next instruction from memory according to current program counter
@@ -52,454 +78,454 @@ void NESDL_CPU::RunNextInstruction()
     switch (opcode)
     {
         case 0x00:
-            OP_BRK(AddrMode::IMPLICIT);
+            OP_BRK(opcode, AddrMode::IMPLICIT);
             break;
         case 0x01:
-            OP_ORA(AddrMode::INDIRECTX);
+            OP_ORA(opcode, AddrMode::INDIRECTX);
             break;
         case 0x05:
-            OP_ORA(AddrMode::ZEROPAGE);
+            OP_ORA(opcode, AddrMode::ZEROPAGE);
             break;
         case 0x06:
-            OP_ASL(AddrMode::ZEROPAGE);
+            OP_ASL(opcode, AddrMode::ZEROPAGE);
             break;
         case 0x08:
-            OP_PHP(AddrMode::IMPLICIT);
+            OP_PHP(opcode, AddrMode::IMPLICIT);
             break;
         case 0x09:
-            OP_ORA(AddrMode::IMMEDIATE);
+            OP_ORA(opcode, AddrMode::IMMEDIATE);
             break;
         case 0x0A:
-            OP_ASL(AddrMode::ACCUMULATOR);
+            OP_ASL(opcode, AddrMode::ACCUMULATOR);
             break;
         case 0x0D:
-            OP_ORA(AddrMode::ABSOLUTE);
+            OP_ORA(opcode, AddrMode::ABSOLUTE);
             break;
         case 0x0E:
-            OP_ASL(AddrMode::ABSOLUTE);
+            OP_ASL(opcode, AddrMode::ABSOLUTE);
             break;
         case 0x10:
-            OP_BPL(AddrMode::RELATIVE);
+            OP_BPL(opcode, AddrMode::RELATIVE);
             break;
         case 0x11:
-            OP_ORA(AddrMode::INDIRECTY);
+            OP_ORA(opcode, AddrMode::INDIRECTY);
             break;
         case 0x15:
-            OP_ORA(AddrMode::ZEROPAGEX);
+            OP_ORA(opcode, AddrMode::ZEROPAGEX);
             break;
         case 0x16:
-            OP_ASL(AddrMode::ZEROPAGEX);
+            OP_ASL(opcode, AddrMode::ZEROPAGEX);
             break;
         case 0x18:
-            OP_CLC(AddrMode::IMPLICIT);
+            OP_CLC(opcode, AddrMode::IMPLICIT);
             break;
         case 0x19:
-            OP_ORA(AddrMode::ABSOLUTEY);
+            OP_ORA(opcode, AddrMode::ABSOLUTEY);
             break;
         case 0x1D:
-            OP_ORA(AddrMode::ABSOLUTEX);
+            OP_ORA(opcode, AddrMode::ABSOLUTEX);
             break;
         case 0x1E:
-            OP_ASL(AddrMode::ABSOLUTEX);
+            OP_ASL(opcode, AddrMode::ABSOLUTEX);
             break;
         case 0x20:
-            OP_JSR(AddrMode::ABSOLUTE);
+            OP_JSR(opcode, AddrMode::ABSOLUTE);
             break;
         case 0x21:
-            OP_AND(AddrMode::INDIRECTX);
+            OP_AND(opcode, AddrMode::INDIRECTX);
             break;
         case 0x24:
-            OP_BIT(AddrMode::ZEROPAGE);
+            OP_BIT(opcode, AddrMode::ZEROPAGE);
             break;
         case 0x25:
-            OP_AND(AddrMode::ZEROPAGE);
+            OP_AND(opcode, AddrMode::ZEROPAGE);
             break;
         case 0x26:
-            OP_ROL(AddrMode::ZEROPAGE);
+            OP_ROL(opcode, AddrMode::ZEROPAGE);
             break;
         case 0x28:
-            OP_PLP(AddrMode::IMPLICIT);
+            OP_PLP(opcode, AddrMode::IMPLICIT);
             break;
         case 0x29:
-            OP_AND(AddrMode::IMMEDIATE);
+            OP_AND(opcode, AddrMode::IMMEDIATE);
             break;
         case 0x2A:
-            OP_ROL(AddrMode::ACCUMULATOR);
+            OP_ROL(opcode, AddrMode::ACCUMULATOR);
             break;
         case 0x2C:
-            OP_BIT(AddrMode::ABSOLUTE);
+            OP_BIT(opcode, AddrMode::ABSOLUTE);
             break;
         case 0x2D:
-            OP_AND(AddrMode::ABSOLUTE);
+            OP_AND(opcode, AddrMode::ABSOLUTE);
             break;
         case 0x2E:
-            OP_ROL(AddrMode::ABSOLUTE);
+            OP_ROL(opcode, AddrMode::ABSOLUTE);
             break;
         case 0x30:
-            OP_BMI(AddrMode::RELATIVE);
+            OP_BMI(opcode, AddrMode::RELATIVE);
             break;
         case 0x31:
-            OP_AND(AddrMode::INDIRECTY);
+            OP_AND(opcode, AddrMode::INDIRECTY);
             break;
         case 0x35:
-            OP_AND(AddrMode::ZEROPAGEX);
+            OP_AND(opcode, AddrMode::ZEROPAGEX);
             break;
         case 0x36:
-            OP_ROL(AddrMode::ZEROPAGEX);
+            OP_ROL(opcode, AddrMode::ZEROPAGEX);
             break;
         case 0x38:
-            OP_SEC(AddrMode::IMPLICIT);
+            OP_SEC(opcode, AddrMode::IMPLICIT);
             break;
         case 0x39:
-            OP_AND(AddrMode::ABSOLUTEY);
+            OP_AND(opcode, AddrMode::ABSOLUTEY);
             break;
         case 0x3D:
-            OP_AND(AddrMode::ABSOLUTEX);
+            OP_AND(opcode, AddrMode::ABSOLUTEX);
             break;
         case 0x3E:
-            OP_ROL(AddrMode::ABSOLUTEX);
+            OP_ROL(opcode, AddrMode::ABSOLUTEX);
             break;
         case 0x40:
-            OP_RTI(AddrMode::IMPLICIT);
+            OP_RTI(opcode, AddrMode::IMPLICIT);
             break;
         case 0x41:
-            OP_EOR(AddrMode::INDIRECTX);
+            OP_EOR(opcode, AddrMode::INDIRECTX);
             break;
         case 0x45:
-            OP_EOR(AddrMode::ZEROPAGE);
+            OP_EOR(opcode, AddrMode::ZEROPAGE);
             break;
         case 0x46:
-            OP_LSR(AddrMode::ZEROPAGE);
+            OP_LSR(opcode, AddrMode::ZEROPAGE);
             break;
         case 0x48:
-            OP_PHA(AddrMode::IMPLICIT);
+            OP_PHA(opcode, AddrMode::IMPLICIT);
             break;
         case 0x49:
-            OP_EOR(AddrMode::IMMEDIATE);
+            OP_EOR(opcode, AddrMode::IMMEDIATE);
             break;
         case 0x4A:
-            OP_LSR(AddrMode::ACCUMULATOR);
+            OP_LSR(opcode, AddrMode::ACCUMULATOR);
             break;
         case 0x4C:
-            OP_JMP(false);
+            OP_JMP(opcode, false);
             break;
         case 0x4D:
-            OP_EOR(AddrMode::ABSOLUTE);
+            OP_EOR(opcode, AddrMode::ABSOLUTE);
             break;
         case 0x4E:
-            OP_LSR(AddrMode::ABSOLUTE);
+            OP_LSR(opcode, AddrMode::ABSOLUTE);
             break;
         case 0x50:
-            OP_BVC(AddrMode::RELATIVE);
+            OP_BVC(opcode, AddrMode::RELATIVE);
             break;
         case 0x51:
-            OP_EOR(AddrMode::INDIRECTY);
+            OP_EOR(opcode, AddrMode::INDIRECTY);
             break;
         case 0x55:
-            OP_EOR(AddrMode::ZEROPAGEX);
+            OP_EOR(opcode, AddrMode::ZEROPAGEX);
             break;
         case 0x56:
-            OP_LSR(AddrMode::ZEROPAGEX);
+            OP_LSR(opcode, AddrMode::ZEROPAGEX);
             break;
         case 0x58:
-            OP_CLI(AddrMode::IMPLICIT);
+            OP_CLI(opcode, AddrMode::IMPLICIT);
             break;
         case 0x59:
-            OP_EOR(AddrMode::ABSOLUTEY);
+            OP_EOR(opcode, AddrMode::ABSOLUTEY);
             break;
         case 0x5D:
-            OP_EOR(AddrMode::ABSOLUTEX);
+            OP_EOR(opcode, AddrMode::ABSOLUTEX);
             break;
         case 0x5E:
-            OP_LSR(AddrMode::ABSOLUTEX);
+            OP_LSR(opcode, AddrMode::ABSOLUTEX);
             break;
         case 0x60:
-            OP_RTS(AddrMode::IMPLICIT);
+            OP_RTS(opcode, AddrMode::IMPLICIT);
             break;
         case 0x61:
-            OP_ADC(AddrMode::INDIRECTX);
+            OP_ADC(opcode, AddrMode::INDIRECTX);
             break;
         case 0x65:
-            OP_ADC(AddrMode::ZEROPAGE);
+            OP_ADC(opcode, AddrMode::ZEROPAGE);
             break;
         case 0x66:
-            OP_ROR(AddrMode::ZEROPAGE);
+            OP_ROR(opcode, AddrMode::ZEROPAGE);
             break;
         case 0x68:
-            OP_PLA(AddrMode::IMPLICIT);
+            OP_PLA(opcode, AddrMode::IMPLICIT);
             break;
         case 0x69:
-            OP_ADC(AddrMode::IMMEDIATE);
+            OP_ADC(opcode, AddrMode::IMMEDIATE);
             break;
         case 0x6A:
-            OP_ROR(AddrMode::ACCUMULATOR);
+            OP_ROR(opcode, AddrMode::ACCUMULATOR);
             break;
         case 0x6C:
-            OP_JMP(true);
+            OP_JMP(opcode, true);
             break;
         case 0x6D:
-            OP_ADC(AddrMode::ABSOLUTE);
+            OP_ADC(opcode, AddrMode::ABSOLUTE);
             break;
         case 0x6E:
-            OP_ROR(AddrMode::ABSOLUTE);
+            OP_ROR(opcode, AddrMode::ABSOLUTE);
             break;
         case 0x70:
-            OP_BVS(AddrMode::RELATIVE);
+            OP_BVS(opcode, AddrMode::RELATIVE);
             break;
         case 0x71:
-            OP_ADC(AddrMode::INDIRECTY);
+            OP_ADC(opcode, AddrMode::INDIRECTY);
             break;
         case 0x75:
-            OP_ADC(AddrMode::ZEROPAGEX);
+            OP_ADC(opcode, AddrMode::ZEROPAGEX);
             break;
         case 0x76:
-            OP_ROR(AddrMode::ZEROPAGEX);
+            OP_ROR(opcode, AddrMode::ZEROPAGEX);
             break;
         case 0x78:
-            OP_SEI(AddrMode::IMPLICIT);
+            OP_SEI(opcode, AddrMode::IMPLICIT);
             break;
         case 0x79:
-            OP_ADC(AddrMode::ABSOLUTEY);
+            OP_ADC(opcode, AddrMode::ABSOLUTEY);
             break;
         case 0x7D:
-            OP_ADC(AddrMode::ABSOLUTEX);
+            OP_ADC(opcode, AddrMode::ABSOLUTEX);
             break;
         case 0x7E:
-            OP_ROR(AddrMode::ABSOLUTEX);
+            OP_ROR(opcode, AddrMode::ABSOLUTEX);
             break;
         case 0x81:
-            OP_STA(AddrMode::INDIRECTX);
+            OP_STA(opcode, AddrMode::INDIRECTX);
             break;
         case 0x84:
-            OP_STY(AddrMode::ZEROPAGE);
+            OP_STY(opcode, AddrMode::ZEROPAGE);
             break;
         case 0x85:
-            OP_STA(AddrMode::ZEROPAGE);
+            OP_STA(opcode, AddrMode::ZEROPAGE);
             break;
         case 0x86:
-            OP_STX(AddrMode::ZEROPAGE);
+            OP_STX(opcode, AddrMode::ZEROPAGE);
             break;
         case 0x88:
-            OP_DEY(AddrMode::IMPLICIT);
+            OP_DEY(opcode, AddrMode::IMPLICIT);
             break;
         case 0x8A:
-            OP_TXA(AddrMode::IMPLICIT);
+            OP_TXA(opcode, AddrMode::IMPLICIT);
             break;
         case 0x8C:
-            OP_STY(AddrMode::ABSOLUTE);
+            OP_STY(opcode, AddrMode::ABSOLUTE);
             break;
         case 0x8D:
-            OP_STA(AddrMode::ABSOLUTE);
+            OP_STA(opcode, AddrMode::ABSOLUTE);
             break;
         case 0x8E:
-            OP_STX(AddrMode::ABSOLUTE);
+            OP_STX(opcode, AddrMode::ABSOLUTE);
             break;
         case 0x90:
-            OP_BCC(AddrMode::RELATIVE);
+            OP_BCC(opcode, AddrMode::RELATIVE);
             break;
         case 0x91:
-            OP_STA(AddrMode::INDIRECTY);
+            OP_STA(opcode, AddrMode::INDIRECTY);
             break;
         case 0x94:
-            OP_STY(AddrMode::ZEROPAGEX);
+            OP_STY(opcode, AddrMode::ZEROPAGEX);
             break;
         case 0x95:
-            OP_STA(AddrMode::ZEROPAGEX);
+            OP_STA(opcode, AddrMode::ZEROPAGEX);
             break;
         case 0x96:
-            OP_STX(AddrMode::ZEROPAGEY);
+            OP_STX(opcode, AddrMode::ZEROPAGEY);
             break;
         case 0x98:
-            OP_TYA(AddrMode::IMPLICIT);
+            OP_TYA(opcode, AddrMode::IMPLICIT);
             break;
         case 0x99:
-            OP_STA(AddrMode::ABSOLUTEY);
+            OP_STA(opcode, AddrMode::ABSOLUTEY);
             break;
         case 0x9A:
-            OP_TXS(AddrMode::IMPLICIT);
+            OP_TXS(opcode, AddrMode::IMPLICIT);
             break;
         case 0x9D:
-            OP_STA(AddrMode::ABSOLUTEX);
+            OP_STA(opcode, AddrMode::ABSOLUTEX);
             break;
         case 0xA0:
-            OP_LDY(AddrMode::IMMEDIATE);
+            OP_LDY(opcode, AddrMode::IMMEDIATE);
             break;
         case 0xA1:
-            OP_LDA(AddrMode::INDIRECTX);
+            OP_LDA(opcode, AddrMode::INDIRECTX);
             break;
         case 0xA2:
-            OP_LDX(AddrMode::IMMEDIATE);
+            OP_LDX(opcode, AddrMode::IMMEDIATE);
             break;
         case 0xA4:
-            OP_LDY(AddrMode::ZEROPAGE);
+            OP_LDY(opcode, AddrMode::ZEROPAGE);
             break;
         case 0xA5:
-            OP_LDA(AddrMode::ZEROPAGE);
+            OP_LDA(opcode, AddrMode::ZEROPAGE);
             break;
         case 0xA6:
-            OP_LDX(AddrMode::ZEROPAGE);
+            OP_LDX(opcode, AddrMode::ZEROPAGE);
             break;
         case 0xA8:
-            OP_TAY(AddrMode::IMPLICIT);
+            OP_TAY(opcode, AddrMode::IMPLICIT);
             break;
         case 0xA9:
-            OP_LDA(AddrMode::IMMEDIATE);
+            OP_LDA(opcode, AddrMode::IMMEDIATE);
             break;
         case 0xAA:
-            OP_TAX(AddrMode::IMPLICIT);
+            OP_TAX(opcode, AddrMode::IMPLICIT);
             break;
         case 0xAC:
-            OP_LDY(AddrMode::ABSOLUTE);
+            OP_LDY(opcode, AddrMode::ABSOLUTE);
             break;
         case 0xAD:
-            OP_LDA(AddrMode::ABSOLUTE);
+            OP_LDA(opcode, AddrMode::ABSOLUTE);
             break;
         case 0xAE:
-            OP_LDX(AddrMode::ABSOLUTE);
+            OP_LDX(opcode, AddrMode::ABSOLUTE);
             break;
         case 0xB0:
-            OP_BCS(AddrMode::RELATIVE);
+            OP_BCS(opcode, AddrMode::RELATIVE);
             break;
         case 0xB1:
-            OP_LDA(AddrMode::INDIRECTY);
+            OP_LDA(opcode, AddrMode::INDIRECTY);
             break;
         case 0xB4:
-            OP_LDY(AddrMode::ZEROPAGEX);
+            OP_LDY(opcode, AddrMode::ZEROPAGEX);
             break;
         case 0xB5:
-            OP_LDA(AddrMode::ZEROPAGEX);
+            OP_LDA(opcode, AddrMode::ZEROPAGEX);
             break;
         case 0xB6:
-            OP_LDX(AddrMode::ZEROPAGEY);
+            OP_LDX(opcode, AddrMode::ZEROPAGEY);
             break;
         case 0xB8:
-            OP_CLV(AddrMode::IMPLICIT);
+            OP_CLV(opcode, AddrMode::IMPLICIT);
             break;
         case 0xB9:
-            OP_LDA(AddrMode::ABSOLUTEY);
+            OP_LDA(opcode, AddrMode::ABSOLUTEY);
             break;
         case 0xBA:
-            OP_TSX(AddrMode::IMPLICIT);
+            OP_TSX(opcode, AddrMode::IMPLICIT);
             break;
         case 0xBC:
-            OP_LDY(AddrMode::ABSOLUTEX);
+            OP_LDY(opcode, AddrMode::ABSOLUTEX);
             break;
         case 0xBD:
-            OP_LDA(AddrMode::ABSOLUTEX);
+            OP_LDA(opcode, AddrMode::ABSOLUTEX);
             break;
         case 0xBE:
-            OP_LDX(AddrMode::ABSOLUTEY);
+            OP_LDX(opcode, AddrMode::ABSOLUTEY);
             break;
         case 0xC0:
-            OP_CPY(AddrMode::IMMEDIATE);
+            OP_CPY(opcode, AddrMode::IMMEDIATE);
             break;
         case 0xC1:
-            OP_CMP(AddrMode::INDIRECTX);
+            OP_CMP(opcode, AddrMode::INDIRECTX);
             break;
         case 0xC4:
-            OP_CPY(AddrMode::ZEROPAGE);
+            OP_CPY(opcode, AddrMode::ZEROPAGE);
             break;
         case 0xC5:
-            OP_CMP(AddrMode::ZEROPAGE);
+            OP_CMP(opcode, AddrMode::ZEROPAGE);
             break;
         case 0xC6:
-            OP_DEC(AddrMode::ZEROPAGE);
+            OP_DEC(opcode, AddrMode::ZEROPAGE);
             break;
         case 0xC8:
-            OP_INY(AddrMode::IMPLICIT);
+            OP_INY(opcode, AddrMode::IMPLICIT);
             break;
         case 0xC9:
-            OP_CMP(AddrMode::IMMEDIATE);
+            OP_CMP(opcode, AddrMode::IMMEDIATE);
             break;
         case 0xCA:
-            OP_DEX(AddrMode::IMPLICIT);
+            OP_DEX(opcode, AddrMode::IMPLICIT);
             break;
         case 0xCC:
-            OP_CPY(AddrMode::ABSOLUTE);
+            OP_CPY(opcode, AddrMode::ABSOLUTE);
             break;
         case 0xCD:
-            OP_CMP(AddrMode::ABSOLUTE);
+            OP_CMP(opcode, AddrMode::ABSOLUTE);
             break;
         case 0xCE:
-            OP_DEC(AddrMode::ABSOLUTE);
+            OP_DEC(opcode, AddrMode::ABSOLUTE);
             break;
         case 0xD0:
-            OP_BNE(AddrMode::RELATIVE);
+            OP_BNE(opcode, AddrMode::RELATIVE);
             break;
         case 0xD1:
-            OP_CMP(AddrMode::INDIRECTY);
+            OP_CMP(opcode, AddrMode::INDIRECTY);
             break;
         case 0xD5:
-            OP_CMP(AddrMode::ZEROPAGEX);
+            OP_CMP(opcode, AddrMode::ZEROPAGEX);
             break;
         case 0xD6:
-            OP_DEC(AddrMode::ZEROPAGEX);
+            OP_DEC(opcode, AddrMode::ZEROPAGEX);
             break;
         case 0xD8:
-            OP_CLD(AddrMode::IMPLICIT);
+            OP_CLD(opcode, AddrMode::IMPLICIT);
             break;
         case 0xD9:
-            OP_CMP(AddrMode::ABSOLUTEY);
+            OP_CMP(opcode, AddrMode::ABSOLUTEY);
             break;
         case 0xDD:
-            OP_CMP(AddrMode::ABSOLUTEX);
+            OP_CMP(opcode, AddrMode::ABSOLUTEX);
             break;
         case 0xDE:
-            OP_DEC(AddrMode::ABSOLUTEX);
+            OP_DEC(opcode, AddrMode::ABSOLUTEX);
             break;
         case 0xE0:
-            OP_CPX(AddrMode::IMMEDIATE);
+            OP_CPX(opcode, AddrMode::IMMEDIATE);
             break;
         case 0xE1:
-            OP_SBC(AddrMode::INDIRECTX);
+            OP_SBC(opcode, AddrMode::INDIRECTX);
             break;
         case 0xE4:
-            OP_CPX(AddrMode::ZEROPAGE);
+            OP_CPX(opcode, AddrMode::ZEROPAGE);
             break;
         case 0xE5:
-            OP_SBC(AddrMode::ZEROPAGE);
+            OP_SBC(opcode, AddrMode::ZEROPAGE);
             break;
         case 0xE6:
-            OP_INC(AddrMode::ZEROPAGE);
+            OP_INC(opcode, AddrMode::ZEROPAGE);
             break;
         case 0xE8:
-            OP_INX(AddrMode::IMPLICIT);
+            OP_INX(opcode, AddrMode::IMPLICIT);
             break;
         case 0xE9:
-            OP_SBC(AddrMode::IMMEDIATE);
+            OP_SBC(opcode, AddrMode::IMMEDIATE);
             break;
         case 0xEC:
-            OP_CPX(AddrMode::ABSOLUTE);
+            OP_CPX(opcode, AddrMode::ABSOLUTE);
             break;
         case 0xED:
-            OP_SBC(AddrMode::ABSOLUTE);
+            OP_SBC(opcode, AddrMode::ABSOLUTE);
             break;
         case 0xEE:
-            OP_INC(AddrMode::ABSOLUTE);
+            OP_INC(opcode, AddrMode::ABSOLUTE);
             break;
         case 0xF0:
-            OP_BEQ(AddrMode::RELATIVE);
+            OP_BEQ(opcode, AddrMode::RELATIVE);
             break;
         case 0xF1:
-            OP_SBC(AddrMode::INDIRECTY);
+            OP_SBC(opcode, AddrMode::INDIRECTY);
             break;
         case 0xF5:
-            OP_SBC(AddrMode::ZEROPAGEX);
+            OP_SBC(opcode, AddrMode::ZEROPAGEX);
             break;
         case 0xF6:
-            OP_INC(AddrMode::ZEROPAGEX);
+            OP_INC(opcode, AddrMode::ZEROPAGEX);
             break;
         case 0xF8:
-            OP_SED(AddrMode::IMPLICIT);
+            OP_SED(opcode, AddrMode::IMPLICIT);
             break;
         case 0xF9:
-            OP_SBC(AddrMode::ABSOLUTEY);
+            OP_SBC(opcode, AddrMode::ABSOLUTEY);
             break;
         case 0xFD:
-            OP_SBC(AddrMode::ABSOLUTEX);
+            OP_SBC(opcode, AddrMode::ABSOLUTEX);
             break;
         case 0xFE:
-            OP_INC(AddrMode::ABSOLUTEX);
+            OP_INC(opcode, AddrMode::ABSOLUTEX);
             break;
         case 0x80:
         case 0x82:
@@ -529,7 +555,7 @@ void NESDL_CPU::RunNextInstruction()
         case 0x7C:
         case 0xDC:
         case 0xFC:
-            OP_NOP(AddrMode::IMPLICIT);
+            OP_NOP(opcode, AddrMode::IMPLICIT);
             break;
         default:
             OP_KIL();
@@ -537,17 +563,16 @@ void NESDL_CPU::RunNextInstruction()
     }
 }
 
-
-uint64_t NESDL_CPU::MillisecondsToCPUCycles(double ms)
-{
-	return (NESDL_CPU_CLOCK / 1000) * ms;
-}
-
-double NESDL_CPU::CPUCyclesToMilliseconds(uint64_t cycles)
-{
-	double clockToSecs = 1 / (double)NESDL_CPU_CLOCK;
-    return clockToSecs * cycles;
-}
+//uint64_t NESDL_CPU::MillisecondsToCPUCycles(double ms)
+//{
+//	return (NESDL_CPU_CLOCK / 1000) * ms;
+//}
+//
+//double NESDL_CPU::CPUCyclesToMilliseconds(uint64_t cycles)
+//{
+//	double clockToSecs = 1 / (double)NESDL_CPU_CLOCK;
+//    return clockToSecs * cycles;
+//}
 
 // Returns 1 if the value > 0, -1 if the value is < 0, and 0 if the value is 0.
 template <typename T> int8_t sign(T val) {
@@ -645,10 +670,12 @@ void NESDL_CPU::GetByteForAddressMode(AddrMode mode, AddressModeResult* result)
         {
             uint8_t addr = core->ram->ReadByte(registers.pc++);
             uint16_t lsb = core->ram->ReadByte(addr);
-            uint16_t hsb = (core->ram->ReadByte(addr + 1) << 8) + registers.y;
+            uint16_t hsb = (core->ram->ReadByte(addr + 1) << 8);
+            uint16_t resultAddr = hsb + lsb;
+            uint16_t targetAddr = resultAddr + registers.y;
             // Trigger an "oops" if this mode crossed page bounds
-            core->ram->oops = (addr % 0x100) == ((addr+1) % 0x100);
-            result->value = core->ram->ReadByte(hsb + lsb);
+            core->ram->oops = (resultAddr / 0x100) != (targetAddr / 0x100);
+            result->value = core->ram->ReadByte(targetAddr);
             result->address = addr;
             break;
         }
@@ -657,52 +684,84 @@ void NESDL_CPU::GetByteForAddressMode(AddrMode mode, AddressModeResult* result)
 
 // Advances the CPU cycle count for most address modes with a consistent cycle count
 // (With the exception of IMPLICIT as it's specific per-opcode)
-void NESDL_CPU::AdvanceCyclesForAddressMode(AddrMode mode, bool pageCross, bool extraCycles, bool relSuccess)
+void NESDL_CPU::AdvanceCyclesForAddressMode(uint8_t opcode, AddrMode mode, bool pageCross, bool extraCycles, bool relSuccess)
 {
+    elapsedCycles += GetCyclesForAddressMode(opcode, mode, pageCross, extraCycles, relSuccess);
+}
+
+uint8_t NESDL_CPU::GetCyclesForAddressMode(uint8_t opcode, AddrMode mode, bool pageCross, bool extraCycles, bool relSuccess)
+{
+    if (opcode == 0x4C)
+    {
+        return 3;
+    }
+    if (opcode == 0x6C)
+    {
+        return 5;
+    }
     switch (mode)
     {
         case IMPLICIT:
-            // Do nothing
+            // Handle it on a per-instruction basis
+            switch (opcode)
+            {
+                case 0x08:
+                case 0x48:
+                    return 3;
+                    break;
+                case 0x28:
+                case 0x68:
+                    return 4;
+                    break;
+                case 0x40:
+                case 0x60:
+                    return 6;
+                    break;
+                case 0x00:
+                    return 7;
+                    break;
+            }
+            return 2;
             break;
         case ZEROPAGE:
-            elapsedCycles += 3 + (extraCycles ? 2 : 0);
+            return 3 + (extraCycles ? 2 : 0);
             break;
         case ZEROPAGEX:
         case ZEROPAGEY:
-            elapsedCycles += 4 + (extraCycles ? 2 : 0);
+            return 4 + (extraCycles ? 2 : 0);
             break;
         case ABSOLUTE:
-            elapsedCycles += 4 + (extraCycles ? 2 : 0); // One exception being JMP (3/5 cycles)
+            return 4 + (extraCycles ? 2 : 0); // One exception being JMP (3/5 cycles)
             break;
         case ABSOLUTEX:
-            elapsedCycles += 4 + (extraCycles ? 3 : pageCross);
+            return 4 + (extraCycles ? 3 : pageCross);
             break;
         case ABSOLUTEY:
-            elapsedCycles += 4 + pageCross;
+            return 4 + pageCross;
             break;
         case RELATIVE:
-            elapsedCycles += 2 + pageCross + relSuccess;
+            return 2 + pageCross + relSuccess;
             break;
         case ACCUMULATOR:
         case IMMEDIATE:
-            elapsedCycles += 2;
+            return 2;
             break;
         case INDIRECTX:
-            elapsedCycles += 6;
+            return 6;
             break;
         case INDIRECTY:
-            elapsedCycles += 5 + pageCross;
+            return 5 + pageCross;
             break;
     }
 }
 
-void NESDL_CPU::OP_ADC(AddrMode mode)
+void NESDL_CPU::OP_ADC(uint8_t opcode, AddrMode mode)
 {
     uint8_t oldAcc = registers.a;
     uint8_t carry = registers.p & PSTATUS_CARRY;
     
     GetByteForAddressMode(mode, addrModeResult);
-    AdvanceCyclesForAddressMode(mode, core->ram->oops, false, false);
+    AdvanceCyclesForAddressMode(opcode, mode, core->ram->oops, false, false);
     
     uint8_t val = addrModeResult->value;
     uint8_t result = oldAcc + val + carry;
@@ -720,10 +779,10 @@ void NESDL_CPU::OP_ADC(AddrMode mode)
     SetPSFlag(PSTATUS_NEGATIVE, sign((int8_t)result) < 0);
 }
 
-void NESDL_CPU::OP_AND(AddrMode mode)
+void NESDL_CPU::OP_AND(uint8_t opcode, AddrMode mode)
 {
     GetByteForAddressMode(mode, addrModeResult);
-    AdvanceCyclesForAddressMode(mode, core->ram->oops, false, false);
+    AdvanceCyclesForAddressMode(opcode, mode, core->ram->oops, false, false);
     
     uint8_t val = addrModeResult->value;
     registers.a &= val;
@@ -732,7 +791,7 @@ void NESDL_CPU::OP_AND(AddrMode mode)
     SetPSFlag(PSTATUS_ZERO, registers.a == 0);
 }
 
-void NESDL_CPU::OP_ASL(AddrMode mode)
+void NESDL_CPU::OP_ASL(uint8_t opcode, AddrMode mode)
 {
     uint8_t value = 0;
     uint8_t oldValue = 0;
@@ -751,18 +810,18 @@ void NESDL_CPU::OP_ASL(AddrMode mode)
         value = val;
         core->ram->WriteByte(addrModeResult->address, val);
     }
-    AdvanceCyclesForAddressMode(mode, false, true, false);
+    AdvanceCyclesForAddressMode(opcode, mode, false, true, false);
     
     SetPSFlag(PSTATUS_CARRY, (oldValue & 0x80) >> 6); // Set to old value bit 7
     SetPSFlag(PSTATUS_ZERO, registers.a == 0);
     SetPSFlag(PSTATUS_NEGATIVE, (value & 0x80) >> 6); // Set to new value bit 7
 }
 
-void NESDL_CPU::OP_BCC(AddrMode mode)
+void NESDL_CPU::OP_BCC(uint8_t opcode, AddrMode mode)
 {
     GetByteForAddressMode(mode, addrModeResult);
     uint16_t oldAddr = registers.pc;
-    uint16_t newAddr = oldAddr + addrModeResult->value;
+    uint16_t newAddr = oldAddr + (int8_t)addrModeResult->value;
     bool newPage = (oldAddr / 0x100) != (newAddr / 0x100);
     bool didBranch = false;
     
@@ -773,14 +832,14 @@ void NESDL_CPU::OP_BCC(AddrMode mode)
         didBranch = true;
     }
     
-    AdvanceCyclesForAddressMode(mode, newPage, false, didBranch);
+    AdvanceCyclesForAddressMode(opcode, mode, newPage, false, didBranch);
 }
 
-void NESDL_CPU::OP_BCS(AddrMode mode)
+void NESDL_CPU::OP_BCS(uint8_t opcode, AddrMode mode)
 {
     GetByteForAddressMode(mode, addrModeResult);
     uint16_t oldAddr = registers.pc;
-    uint16_t newAddr = oldAddr + addrModeResult->value;
+    uint16_t newAddr = oldAddr + (int8_t)addrModeResult->value;
     bool newPage = (oldAddr / 0x100) != (newAddr / 0x100);
     bool didBranch = false;
     
@@ -791,14 +850,14 @@ void NESDL_CPU::OP_BCS(AddrMode mode)
         didBranch = true;
     }
     
-    AdvanceCyclesForAddressMode(mode, newPage, false, didBranch);
+    AdvanceCyclesForAddressMode(opcode, mode, newPage, false, didBranch);
 }
 
-void NESDL_CPU::OP_BEQ(AddrMode mode)
+void NESDL_CPU::OP_BEQ(uint8_t opcode, AddrMode mode)
 {
     GetByteForAddressMode(mode, addrModeResult);
     uint16_t oldAddr = registers.pc;
-    uint16_t newAddr = oldAddr + addrModeResult->value;
+    uint16_t newAddr = oldAddr + (int8_t)addrModeResult->value;
     bool newPage = (oldAddr / 0x100) != (newAddr / 0x100);
     bool didBranch = false;
     
@@ -809,24 +868,24 @@ void NESDL_CPU::OP_BEQ(AddrMode mode)
         didBranch = true;
     }
     
-    AdvanceCyclesForAddressMode(mode, newPage, false, didBranch);
+    AdvanceCyclesForAddressMode(opcode, mode, newPage, false, didBranch);
 }
 
-void NESDL_CPU::OP_BIT(AddrMode mode)
+void NESDL_CPU::OP_BIT(uint8_t opcode, AddrMode mode)
 {
     GetByteForAddressMode(mode, addrModeResult);
-    AdvanceCyclesForAddressMode(mode, false, false, false);
+    AdvanceCyclesForAddressMode(opcode, mode, false, false, false);
     uint8_t result = registers.a & addrModeResult->value;
     SetPSFlag(PSTATUS_ZERO, result == 0);
     SetPSFlag(PSTATUS_OVERFLOW, (result & PSTATUS_OVERFLOW) >> 5);
     SetPSFlag(PSTATUS_NEGATIVE, (result & PSTATUS_NEGATIVE) >> 6);
 }
 
-void NESDL_CPU::OP_BMI(AddrMode mode)
+void NESDL_CPU::OP_BMI(uint8_t opcode, AddrMode mode)
 {
     GetByteForAddressMode(mode, addrModeResult);
     uint16_t oldAddr = registers.pc;
-    uint16_t newAddr = oldAddr + addrModeResult->value;
+    uint16_t newAddr = oldAddr + (int8_t)addrModeResult->value;
     bool newPage = (oldAddr / 0x100) != (newAddr / 0x100);
     bool didBranch = false;
     
@@ -837,14 +896,14 @@ void NESDL_CPU::OP_BMI(AddrMode mode)
         didBranch = true;
     }
     
-    AdvanceCyclesForAddressMode(mode, newPage, false, didBranch);
+    AdvanceCyclesForAddressMode(opcode, mode, newPage, false, didBranch);
 }
 
-void NESDL_CPU::OP_BNE(AddrMode mode)
+void NESDL_CPU::OP_BNE(uint8_t opcode, AddrMode mode)
 {
     GetByteForAddressMode(mode, addrModeResult);
     uint16_t oldAddr = registers.pc;
-    uint16_t newAddr = oldAddr + addrModeResult->value;
+    uint16_t newAddr = oldAddr + (int8_t)addrModeResult->value;
     bool newPage = (oldAddr / 0x100) != (newAddr / 0x100);
     bool didBranch = false;
     
@@ -854,15 +913,19 @@ void NESDL_CPU::OP_BNE(AddrMode mode)
         registers.pc = newAddr;
         didBranch = true;
     }
+    else
+    {
+        newPage = false;
+    }
     
-    AdvanceCyclesForAddressMode(mode, newPage, false, didBranch);
+    AdvanceCyclesForAddressMode(opcode, mode, newPage, false, didBranch);
 }
 
-void NESDL_CPU::OP_BPL(AddrMode mode)
+void NESDL_CPU::OP_BPL(uint8_t opcode, AddrMode mode)
 {
     GetByteForAddressMode(mode, addrModeResult);
     uint16_t oldAddr = registers.pc;
-    uint16_t newAddr = oldAddr + addrModeResult->value;
+    uint16_t newAddr = oldAddr + (int8_t)addrModeResult->value;
     bool newPage = (oldAddr / 0x100) != (newAddr / 0x100);
     bool didBranch = false;
     
@@ -873,10 +936,10 @@ void NESDL_CPU::OP_BPL(AddrMode mode)
         didBranch = true;
     }
     
-    AdvanceCyclesForAddressMode(mode, newPage, false, didBranch);
+    AdvanceCyclesForAddressMode(opcode, mode, newPage, false, didBranch);
 }
 
-void NESDL_CPU::OP_BRK(AddrMode mode)
+void NESDL_CPU::OP_BRK(uint8_t opcode, AddrMode mode)
 {
     // Push PC onto stack in two bytes (high then low since we're going backwards)
     core->ram->WriteByte(STACK_PTR + (registers.sp--), (registers.pc >> 8));
@@ -889,14 +952,15 @@ void NESDL_CPU::OP_BRK(AddrMode mode)
     registers.pc = hsb + lsb;
     // Set break flag
     SetPSFlag(PSTATUS_BREAK, true);
-    elapsedCycles += 7;
+    
+    AdvanceCyclesForAddressMode(opcode, mode, false, false, false);
 }
 
-void NESDL_CPU::OP_BVC(AddrMode mode)
+void NESDL_CPU::OP_BVC(uint8_t opcode, AddrMode mode)
 {
     GetByteForAddressMode(mode, addrModeResult);
     uint16_t oldAddr = registers.pc;
-    uint16_t newAddr = oldAddr + addrModeResult->value;
+    uint16_t newAddr = oldAddr + (int8_t)addrModeResult->value;
     bool newPage = (oldAddr / 0x100) != (newAddr / 0x100);
     bool didBranch = false;
     
@@ -907,14 +971,14 @@ void NESDL_CPU::OP_BVC(AddrMode mode)
         didBranch = true;
     }
     
-    AdvanceCyclesForAddressMode(mode, newPage, false, didBranch);
+    AdvanceCyclesForAddressMode(opcode, mode, newPage, false, didBranch);
 }
 
-void NESDL_CPU::OP_BVS(AddrMode mode)
+void NESDL_CPU::OP_BVS(uint8_t opcode, AddrMode mode)
 {
     GetByteForAddressMode(mode, addrModeResult);
     uint16_t oldAddr = registers.pc;
-    uint16_t newAddr = oldAddr + addrModeResult->value;
+    uint16_t newAddr = oldAddr + (int8_t)addrModeResult->value;
     bool newPage = (oldAddr / 0x100) != (newAddr / 0x100);
     bool didBranch = false;
     
@@ -925,67 +989,72 @@ void NESDL_CPU::OP_BVS(AddrMode mode)
         didBranch = true;
     }
     
-    AdvanceCyclesForAddressMode(mode, newPage, false, didBranch);
+    AdvanceCyclesForAddressMode(opcode, mode, newPage, false, didBranch);
 }
 
-void NESDL_CPU::OP_CLC(AddrMode mode)
+void NESDL_CPU::OP_CLC(uint8_t opcode, AddrMode mode)
 {
     SetPSFlag(PSTATUS_CARRY, false);
-    elapsedCycles += 2; // These take two cycles!?
+    
+    // These take two cycles!?
+    AdvanceCyclesForAddressMode(opcode, mode, false, false, false);
 }
 
-void NESDL_CPU::OP_CLD(AddrMode mode)
+void NESDL_CPU::OP_CLD(uint8_t opcode, AddrMode mode)
 {
     SetPSFlag(PSTATUS_DECIMAL, false);
-    elapsedCycles += 2;
+    
+    AdvanceCyclesForAddressMode(opcode, mode, false, false, false);
 }
 
-void NESDL_CPU::OP_CLI(AddrMode mode)
+void NESDL_CPU::OP_CLI(uint8_t opcode, AddrMode mode)
 {
     SetPSFlag(PSTATUS_INTERRUPTDISABLE, false);
-    elapsedCycles += 2;
+    
+    AdvanceCyclesForAddressMode(opcode, mode, false, false, false);
 }
 
-void NESDL_CPU::OP_CLV(AddrMode mode)
+void NESDL_CPU::OP_CLV(uint8_t opcode, AddrMode mode)
 {
     SetPSFlag(PSTATUS_OVERFLOW, false);
-    elapsedCycles += 2;
+    
+    AdvanceCyclesForAddressMode(opcode, mode, false, false, false);
 }
 
-void NESDL_CPU::OP_CMP(AddrMode mode)
+void NESDL_CPU::OP_CMP(uint8_t opcode, AddrMode mode)
 {
     GetByteForAddressMode(mode, addrModeResult);
-    AdvanceCyclesForAddressMode(mode, core->ram->oops, false, false);
+    AdvanceCyclesForAddressMode(opcode, mode, core->ram->oops, false, false);
     
     SetPSFlag(PSTATUS_CARRY, registers.a >= addrModeResult->value);
     SetPSFlag(PSTATUS_ZERO, registers.a == addrModeResult->value);
-    SetPSFlag(PSTATUS_NEGATIVE, registers.a < addrModeResult->value);
+    SetPSFlag(PSTATUS_NEGATIVE, (int8_t)registers.a < (int8_t)addrModeResult->value);
 }
 
-void NESDL_CPU::OP_CPX(AddrMode mode)
+void NESDL_CPU::OP_CPX(uint8_t opcode, AddrMode mode)
 {
     GetByteForAddressMode(mode, addrModeResult);
-    AdvanceCyclesForAddressMode(mode, core->ram->oops, false, false);
+    AdvanceCyclesForAddressMode(opcode, mode, core->ram->oops, false, false);
     
     SetPSFlag(PSTATUS_CARRY, registers.x >= addrModeResult->value);
     SetPSFlag(PSTATUS_ZERO, registers.x == addrModeResult->value);
-    SetPSFlag(PSTATUS_NEGATIVE, registers.x < addrModeResult->value);
+    SetPSFlag(PSTATUS_NEGATIVE, (int8_t)registers.x < (int8_t)addrModeResult->value);
 }
 
-void NESDL_CPU::OP_CPY(AddrMode mode)
+void NESDL_CPU::OP_CPY(uint8_t opcode, AddrMode mode)
 {
     GetByteForAddressMode(mode, addrModeResult);
-    AdvanceCyclesForAddressMode(mode, core->ram->oops, false, false);
+    AdvanceCyclesForAddressMode(opcode, mode, core->ram->oops, false, false);
     
     SetPSFlag(PSTATUS_CARRY, registers.y >= addrModeResult->value);
     SetPSFlag(PSTATUS_ZERO, registers.y == addrModeResult->value);
-    SetPSFlag(PSTATUS_NEGATIVE, registers.y < addrModeResult->value);
+    SetPSFlag(PSTATUS_NEGATIVE, (int8_t)registers.y < (int8_t)addrModeResult->value);
 }
 
-void NESDL_CPU::OP_DEC(AddrMode mode)
+void NESDL_CPU::OP_DEC(uint8_t opcode, AddrMode mode)
 {
     GetByteForAddressMode(mode, addrModeResult);
-    AdvanceCyclesForAddressMode(mode, false, true, false);
+    AdvanceCyclesForAddressMode(opcode, mode, false, true, false);
     
     uint8_t val = addrModeResult->value - 1;
     core->ram->WriteByte(addrModeResult->address, val);
@@ -994,36 +1063,40 @@ void NESDL_CPU::OP_DEC(AddrMode mode)
     SetPSFlag(PSTATUS_NEGATIVE, sign((int8_t)val) < 0);
 }
 
-void NESDL_CPU::OP_DEX(AddrMode mode)
+void NESDL_CPU::OP_DEX(uint8_t opcode, AddrMode mode)
 {
     registers.x--;
-    elapsedCycles += 2;
+
     SetPSFlag(PSTATUS_ZERO, registers.x == 0);
     SetPSFlag(PSTATUS_NEGATIVE, sign((int8_t)registers.x) < 0);
+    
+    AdvanceCyclesForAddressMode(opcode, mode, false, false, false);
 }
 
-void NESDL_CPU::OP_DEY(AddrMode mode)
+void NESDL_CPU::OP_DEY(uint8_t opcode, AddrMode mode)
 {
     registers.y--;
-    elapsedCycles += 2;
+    
     SetPSFlag(PSTATUS_ZERO, registers.y == 0);
     SetPSFlag(PSTATUS_NEGATIVE, sign((int8_t)registers.y) < 0);
+    
+    AdvanceCyclesForAddressMode(opcode, mode, false, false, false);
 }
 
-void NESDL_CPU::OP_EOR(AddrMode mode)
+void NESDL_CPU::OP_EOR(uint8_t opcode, AddrMode mode)
 {
     GetByteForAddressMode(mode, addrModeResult);
-    AdvanceCyclesForAddressMode(mode, core->ram->oops, false, false);
+    AdvanceCyclesForAddressMode(opcode, mode, core->ram->oops, false, false);
     
     registers.a ^= addrModeResult->value;
     SetPSFlag(PSTATUS_ZERO, registers.a == 0);
     SetPSFlag(PSTATUS_NEGATIVE, sign((int8_t)registers.a) < 0);
 }
 
-void NESDL_CPU::OP_INC(AddrMode mode)
+void NESDL_CPU::OP_INC(uint8_t opcode, AddrMode mode)
 {
     GetByteForAddressMode(mode, addrModeResult);
-    AdvanceCyclesForAddressMode(mode, false, true, false);
+    AdvanceCyclesForAddressMode(opcode, mode, false, true, false);
     
     uint8_t val = addrModeResult->value + 1;
     core->ram->WriteByte(addrModeResult->address, val);
@@ -1032,23 +1105,27 @@ void NESDL_CPU::OP_INC(AddrMode mode)
     SetPSFlag(PSTATUS_NEGATIVE, sign((int8_t)val) < 0);
 }
 
-void NESDL_CPU::OP_INX(AddrMode mode)
+void NESDL_CPU::OP_INX(uint8_t opcode, AddrMode mode)
 {
     registers.x++;
-    elapsedCycles += 2;
+    
     SetPSFlag(PSTATUS_ZERO, registers.x == 0);
     SetPSFlag(PSTATUS_NEGATIVE, sign((int8_t)registers.x) < 0);
+    
+    AdvanceCyclesForAddressMode(opcode, mode, false, false, false);
 }
 
-void NESDL_CPU::OP_INY(AddrMode mode)
+void NESDL_CPU::OP_INY(uint8_t opcode, AddrMode mode)
 {
     registers.y++;
-    elapsedCycles += 2;
+    
     SetPSFlag(PSTATUS_ZERO, registers.y == 0);
     SetPSFlag(PSTATUS_NEGATIVE, sign((int8_t)registers.y) < 0);
+    
+    AdvanceCyclesForAddressMode(opcode, mode, false, false, false);
 }
 
-void NESDL_CPU::OP_JMP(bool indirect)
+void NESDL_CPU::OP_JMP(uint8_t opcode, bool indirect)
 {
     // TODO implement bug where a fetch at a page bounds 0x##FF
     // grabs the LSB at FF but HSB is grabbed at 0x##00 (aka a wrap but always)
@@ -1056,19 +1133,19 @@ void NESDL_CPU::OP_JMP(bool indirect)
     if (indirect)
     {
         addr = core->ram->ReadWord(addr);
-        elapsedCycles += 5;
+        AdvanceCyclesForAddressMode(opcode, AddrMode::ABSOLUTE, false, false, false);
     }
     else
     {
-        elapsedCycles += 3;
+        AdvanceCyclesForAddressMode(opcode, AddrMode::IMPLICIT, false, false, false);
     }
     registers.pc = addr;
 }
 
-void NESDL_CPU::OP_JSR(AddrMode mode)
+void NESDL_CPU::OP_JSR(uint8_t opcode, AddrMode mode)
 {
-    // Retrieve the address (operand)
-    uint16_t addr = core->ram->ReadWord(registers.pc);
+    // Retrieve the address (operand) and advance PC
+    uint16_t addr = core->ram->ReadWord(registers.pc++);
     
     // Push this PC onto the stack to return to later
     core->ram->WriteByte(STACK_PTR + (registers.sp--), (registers.pc >> 8));
@@ -1077,40 +1154,40 @@ void NESDL_CPU::OP_JSR(AddrMode mode)
     // Overwrite the PC with the address
     registers.pc = addr;
     
-    elapsedCycles += 6;
+    AdvanceCyclesForAddressMode(opcode, mode, false, true, false);
 }
 
-void NESDL_CPU::OP_LDA(AddrMode mode)
+void NESDL_CPU::OP_LDA(uint8_t opcode, AddrMode mode)
 {
     GetByteForAddressMode(mode, addrModeResult);
-    AdvanceCyclesForAddressMode(mode, core->ram->oops, false, false);
+    AdvanceCyclesForAddressMode(opcode, mode, core->ram->oops, false, false);
     
     registers.a = addrModeResult->value;
     SetPSFlag(PSTATUS_ZERO, registers.a == 0);
     SetPSFlag(PSTATUS_NEGATIVE, sign((int8_t)registers.a) < 0);
 }
 
-void NESDL_CPU::OP_LDX(AddrMode mode)
+void NESDL_CPU::OP_LDX(uint8_t opcode, AddrMode mode)
 {
     GetByteForAddressMode(mode, addrModeResult);
-    AdvanceCyclesForAddressMode(mode, core->ram->oops, false, false);
+    AdvanceCyclesForAddressMode(opcode, mode, core->ram->oops, false, false);
     
     registers.x = addrModeResult->value;
     SetPSFlag(PSTATUS_ZERO, registers.x == 0);
     SetPSFlag(PSTATUS_NEGATIVE, sign((int8_t)registers.x) < 0);
 }
 
-void NESDL_CPU::OP_LDY(AddrMode mode)
+void NESDL_CPU::OP_LDY(uint8_t opcode, AddrMode mode)
 {
     GetByteForAddressMode(mode, addrModeResult);
-    AdvanceCyclesForAddressMode(mode, core->ram->oops, false, false);
+    AdvanceCyclesForAddressMode(opcode, mode, core->ram->oops, false, false);
     
     registers.y = addrModeResult->value;
     SetPSFlag(PSTATUS_ZERO, registers.y == 0);
     SetPSFlag(PSTATUS_NEGATIVE, sign((int8_t)registers.y) < 0);
 }
 
-void NESDL_CPU::OP_LSR(AddrMode mode)
+void NESDL_CPU::OP_LSR(uint8_t opcode, AddrMode mode)
 {
     uint8_t value = 0;
     uint8_t oldValue = 0;
@@ -1129,59 +1206,64 @@ void NESDL_CPU::OP_LSR(AddrMode mode)
         value = val;
         core->ram->WriteByte(addrModeResult->address, val);
     }
-    AdvanceCyclesForAddressMode(mode, false, true, false);
+    AdvanceCyclesForAddressMode(opcode, mode, false, true, false);
     
     SetPSFlag(PSTATUS_CARRY, (oldValue & 0x01)); // Set to old value bit 0
     SetPSFlag(PSTATUS_ZERO, value == 0);
     SetPSFlag(PSTATUS_NEGATIVE, (value & 0x80) >> 6); // Set to new value bit 7
 }
 
-void NESDL_CPU::OP_NOP(AddrMode mode)
+void NESDL_CPU::OP_NOP(uint8_t opcode, AddrMode mode)
 {
-    elapsedCycles += 2; // nop nop
+    // nop nop
+    AdvanceCyclesForAddressMode(opcode, mode, false, false, false);
 }
 
-void NESDL_CPU::OP_ORA(AddrMode mode)
+void NESDL_CPU::OP_ORA(uint8_t opcode, AddrMode mode)
 {
     GetByteForAddressMode(mode, addrModeResult);
-    AdvanceCyclesForAddressMode(mode, core->ram->oops, false, false);
+    AdvanceCyclesForAddressMode(opcode, mode, core->ram->oops, false, false);
     
     registers.a |= addrModeResult->value;
     SetPSFlag(PSTATUS_ZERO, registers.a == 0);
     SetPSFlag(PSTATUS_NEGATIVE, sign((int8_t)registers.a) < 0);
 }
 
-void NESDL_CPU::OP_PHA(AddrMode mode)
+void NESDL_CPU::OP_PHA(uint8_t opcode, AddrMode mode)
 {
     core->ram->WriteByte(STACK_PTR + (registers.sp--), registers.a);
-    elapsedCycles += 3;
+    
+    AdvanceCyclesForAddressMode(opcode, mode, false, false, false);
 }
 
-void NESDL_CPU::OP_PHP(AddrMode mode)
+void NESDL_CPU::OP_PHP(uint8_t opcode, AddrMode mode)
 {
     core->ram->WriteByte(STACK_PTR + (registers.sp--), registers.p);
-    elapsedCycles += 3;
+    
+    AdvanceCyclesForAddressMode(opcode, mode, false, false, false);
 }
 
-void NESDL_CPU::OP_PLA(AddrMode mode)
+void NESDL_CPU::OP_PLA(uint8_t opcode, AddrMode mode)
 {
     uint8_t stackVal = core->ram->ReadByte(STACK_PTR + (registers.sp++));
     registers.a = stackVal;
     SetPSFlag(PSTATUS_ZERO, stackVal == 0);
     SetPSFlag(PSTATUS_NEGATIVE, sign((int8_t)stackVal) < 0);
-    elapsedCycles += 4;
+    
+    AdvanceCyclesForAddressMode(opcode, mode, false, false, false);
 }
 
-void NESDL_CPU::OP_PLP(AddrMode mode)
+void NESDL_CPU::OP_PLP(uint8_t opcode, AddrMode mode)
 {
     uint8_t stackVal = core->ram->ReadByte(STACK_PTR + (registers.sp++));
     registers.p = stackVal;
     SetPSFlag(PSTATUS_ZERO, stackVal == 0);
     SetPSFlag(PSTATUS_NEGATIVE, sign((int8_t)stackVal) < 0);
-    elapsedCycles += 4;
+    
+    AdvanceCyclesForAddressMode(opcode, mode, false, false, false);
 }
 
-void NESDL_CPU::OP_ROL(AddrMode mode)
+void NESDL_CPU::OP_ROL(uint8_t opcode, AddrMode mode)
 {
     // Similar to ASL except bit 0 becomes the carry flag
     uint8_t value = 0;
@@ -1203,14 +1285,14 @@ void NESDL_CPU::OP_ROL(AddrMode mode)
         value = val;
         core->ram->WriteByte(addrModeResult->address, val);
     }
-    AdvanceCyclesForAddressMode(mode, false, true, false);
+    AdvanceCyclesForAddressMode(opcode, mode, false, true, false);
     
     SetPSFlag(PSTATUS_CARRY, (oldValue & 0x80) >> 6); // Set to old value bit 7
     SetPSFlag(PSTATUS_ZERO, registers.a == 0);
     SetPSFlag(PSTATUS_NEGATIVE, (value & 0x80) >> 6); // Set to new value bit 7
 }
 
-void NESDL_CPU::OP_ROR(AddrMode mode)
+void NESDL_CPU::OP_ROR(uint8_t opcode, AddrMode mode)
 {
     // Similar to ASL except bit 0 becomes the carry flag
     uint8_t value = 0;
@@ -1232,14 +1314,14 @@ void NESDL_CPU::OP_ROR(AddrMode mode)
         value = val;
         core->ram->WriteByte(addrModeResult->address, val);
     }
-    AdvanceCyclesForAddressMode(mode, false, true, false);
+    AdvanceCyclesForAddressMode(opcode, mode, false, true, false);
     
     SetPSFlag(PSTATUS_CARRY, (oldValue & 0x01)); // Set to old value bit 0
     SetPSFlag(PSTATUS_ZERO, registers.a == 0);
     SetPSFlag(PSTATUS_NEGATIVE, (value & 0x80) >> 6); // Set to new value bit 7
 }
 
-void NESDL_CPU::OP_RTI(AddrMode mode)
+void NESDL_CPU::OP_RTI(uint8_t opcode, AddrMode mode)
 {
     // Pull P from stack
     uint8_t p = core->ram->ReadByte(STACK_PTR + (registers.sp++));
@@ -1248,25 +1330,27 @@ void NESDL_CPU::OP_RTI(AddrMode mode)
     uint16_t pc = core->ram->ReadByte(STACK_PTR + (registers.sp++));
     pc += core->ram->ReadByte(STACK_PTR + (registers.sp++)) << 8;
     registers.pc = pc;
-    elapsedCycles += 6;
+    
+    AdvanceCyclesForAddressMode(opcode, mode, false, false, false);
 }
 
-void NESDL_CPU::OP_RTS(AddrMode mode)
+void NESDL_CPU::OP_RTS(uint8_t opcode, AddrMode mode)
 {
     // Pull PC from stack
-    uint16_t pc = core->ram->ReadByte(STACK_PTR + (registers.sp++));
-    pc += core->ram->ReadByte(STACK_PTR + (registers.sp++)) << 8;
-    registers.pc = pc;
-    elapsedCycles += 6;
+    uint16_t pc = core->ram->ReadByte(STACK_PTR + (++registers.sp));
+    pc += core->ram->ReadByte(STACK_PTR + (++registers.sp)) << 8;
+    registers.pc = pc+1; // Not sure why we advance PC once but it seems to work out that way
+    
+    AdvanceCyclesForAddressMode(opcode, mode, false, false, false);
 }
 
-void NESDL_CPU::OP_SBC(AddrMode mode)
+void NESDL_CPU::OP_SBC(uint8_t opcode, AddrMode mode)
 {
     uint8_t oldAcc = registers.a;
     uint8_t carry = registers.p & PSTATUS_CARRY;
     
     GetByteForAddressMode(mode, addrModeResult);
-    AdvanceCyclesForAddressMode(mode, core->ram->oops, false, false);
+    AdvanceCyclesForAddressMode(opcode, mode, core->ram->oops, false, false);
     
     uint8_t val = addrModeResult->value;
     uint8_t result = oldAcc - val - (1 - carry);
@@ -1284,92 +1368,103 @@ void NESDL_CPU::OP_SBC(AddrMode mode)
     SetPSFlag(PSTATUS_NEGATIVE, sign((int8_t)result) < 0);
 }
 
-void NESDL_CPU::OP_SEC(AddrMode mode)
+void NESDL_CPU::OP_SEC(uint8_t opcode, AddrMode mode)
 {
     SetPSFlag(PSTATUS_CARRY, true);
-    elapsedCycles += 2;
+    
+    AdvanceCyclesForAddressMode(opcode, mode, false, false, false);
 }
 
-void NESDL_CPU::OP_SED(AddrMode mode)
+void NESDL_CPU::OP_SED(uint8_t opcode, AddrMode mode)
 {
     SetPSFlag(PSTATUS_DECIMAL, true);
-    elapsedCycles += 2;
+    
+    AdvanceCyclesForAddressMode(opcode, mode, false, false, false);
 }
 
-void NESDL_CPU::OP_SEI(AddrMode mode)
+void NESDL_CPU::OP_SEI(uint8_t opcode, AddrMode mode)
 {
     SetPSFlag(PSTATUS_INTERRUPTDISABLE, true);
-    elapsedCycles += 2;
+    
+    AdvanceCyclesForAddressMode(opcode, mode, false, false, false);
 }
 
-void NESDL_CPU::OP_STA(AddrMode mode)
+void NESDL_CPU::OP_STA(uint8_t opcode, AddrMode mode)
 {
+    core->ppu->incrementV = false;
     GetByteForAddressMode(mode, addrModeResult);
-    AdvanceCyclesForAddressMode(mode, true, false, false);
+    core->ppu->incrementV = true;
+    AdvanceCyclesForAddressMode(opcode, mode, true, false, false);
     
     core->ram->WriteByte(addrModeResult->address, registers.a);
 }
 
-void NESDL_CPU::OP_STX(AddrMode mode)
+void NESDL_CPU::OP_STX(uint8_t opcode, AddrMode mode)
 {
     GetByteForAddressMode(mode, addrModeResult);
-    AdvanceCyclesForAddressMode(mode, false, false, false);
+    AdvanceCyclesForAddressMode(opcode, mode, false, false, false);
     
     core->ram->WriteByte(addrModeResult->address, registers.x);
 }
 
-void NESDL_CPU::OP_STY(AddrMode mode)
+void NESDL_CPU::OP_STY(uint8_t opcode, AddrMode mode)
 {
     GetByteForAddressMode(mode, addrModeResult);
-    AdvanceCyclesForAddressMode(mode, false, false, false);
+    AdvanceCyclesForAddressMode(opcode, mode, false, false, false);
     
     core->ram->WriteByte(addrModeResult->address, registers.y);
 }
 
-void NESDL_CPU::OP_TAX(AddrMode mode)
+void NESDL_CPU::OP_TAX(uint8_t opcode, AddrMode mode)
 {
     registers.x = registers.a;
     SetPSFlag(PSTATUS_ZERO, registers.x == 0);
     SetPSFlag(PSTATUS_NEGATIVE, sign((int8_t)registers.x) < 0);
-    elapsedCycles += 2;
+    
+    AdvanceCyclesForAddressMode(opcode, mode, false, false, false);
 }
 
-void NESDL_CPU::OP_TAY(AddrMode mode)
+void NESDL_CPU::OP_TAY(uint8_t opcode, AddrMode mode)
 {
     registers.y = registers.a;
     SetPSFlag(PSTATUS_ZERO, registers.y == 0);
     SetPSFlag(PSTATUS_NEGATIVE, sign((int8_t)registers.y) < 0);
-    elapsedCycles += 2;
+    
+    AdvanceCyclesForAddressMode(opcode, mode, false, false, false);
 }
 
-void NESDL_CPU::OP_TSX(AddrMode mode)
+void NESDL_CPU::OP_TSX(uint8_t opcode, AddrMode mode)
 {
     registers.x = registers.sp;
     SetPSFlag(PSTATUS_ZERO, registers.x == 0);
     SetPSFlag(PSTATUS_NEGATIVE, sign((int8_t)registers.x) < 0);
-    elapsedCycles += 2;
+    
+    AdvanceCyclesForAddressMode(opcode, mode, false, false, false);
 }
 
-void NESDL_CPU::OP_TXA(AddrMode mode)
+void NESDL_CPU::OP_TXA(uint8_t opcode, AddrMode mode)
 {
     registers.a = registers.x;
     SetPSFlag(PSTATUS_ZERO, registers.a == 0);
     SetPSFlag(PSTATUS_NEGATIVE, sign((int8_t)registers.a) < 0);
-    elapsedCycles += 2;
+    
+    AdvanceCyclesForAddressMode(opcode, mode, false, false, false);
 }
 
-void NESDL_CPU::OP_TXS(AddrMode mode)
+void NESDL_CPU::OP_TXS(uint8_t opcode, AddrMode mode)
 {
     registers.sp = registers.x;
-    elapsedCycles += 2;
+    
+    AdvanceCyclesForAddressMode(opcode, mode, false, false, false);
 }
 
-void NESDL_CPU::OP_TYA(AddrMode mode)
+void NESDL_CPU::OP_TYA(uint8_t opcode, AddrMode mode)
 {
     registers.a = registers.y;
     SetPSFlag(PSTATUS_ZERO, registers.a == 0);
     SetPSFlag(PSTATUS_NEGATIVE, sign((int8_t)registers.a) < 0);
-    elapsedCycles += 2;
+    
+    AdvanceCyclesForAddressMode(opcode, mode, false, false, false);
 }
 
 void NESDL_CPU::OP_KIL()
