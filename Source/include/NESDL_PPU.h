@@ -112,7 +112,7 @@ public:
     uint32_t GetPalette(uint8_t index, bool spriteLayer);
     uint32_t GetColor(uint16_t pattern, uint32_t palette, uint8_t pixelIndex);
     PPURegisters registers;
-    uint32_t frameData[256 * 240]; // Frame buffer
+    uint32_t frameData[NESDL_SCREEN_WIDTH * NESDL_SCREEN_HEIGHT]; // Frame buffer
     bool ignoreChanges;
     bool incrementV;
     uint64_t currentFrame;

@@ -28,6 +28,15 @@ void NESDL_PPU::Init(NESDL_Core* c)
     tileFetch.attribute = 0;
     tileFetch.pattern = 0;
     incrementV = true;
+    
+    // Clear frame buffer before starting
+    for (uint32_t y = 0; y < NESDL_SCREEN_HEIGHT; ++y)
+    {
+        for (uint32_t x = 0; x < NESDL_SCREEN_WIDTH; ++x)
+        {
+            frameData[y * NESDL_SCREEN_HEIGHT + x] = 0;
+        }
+    }
 }
 
 void NESDL_PPU::Update(uint32_t ppuCycles)
@@ -119,10 +128,11 @@ void NESDL_PPU::HandleProcessVisibleScanline()
                 uint16_t currentPixel = (currentScanline * PPU_WIDTH) + currentDrawX;
                 uint32_t palette = GetPalette(toRender.paletteIndex, false);
                 uint32_t color = GetColor(toRender.pattern, palette, i);
-                if (currentScanline % 8 == 0 || currentDrawX % 8 == 0)
-                {
-                    color += 0x00202020;
-                }
+                // Tile debugging lines
+//                if (currentScanline % 8 == 0 || currentDrawX % 8 == 0)
+//                {
+//                    color += 0x00202020;
+//                }
                 frameData[currentPixel] = color;
                 currentDrawX++;
             }
@@ -263,10 +273,10 @@ void NESDL_PPU::FetchAndStoreTile()
         // Start with which pattern bank to read from
         uint16_t patternAddr = ((registers.ctrl & PPUCTRL_BGTILE) >> 4) * 0x1000;
         uint8_t rowIndex = currentScanline % 8;
-        if (currentScanline < 48)
-        {
-            printf("ADDR: %#06x\tSCANLINE: %d\tINDEX: %d\tNT: %d\n", registers.v, currentScanline, rowIndex, tileFetch.nametable);
-        }
+//        if (currentScanline < 48)
+//        {
+//            printf("ADDR: %#06x\tSCANLINE: %d\tINDEX: %d\tNT: %d\n", registers.v, currentScanline, rowIndex, tileFetch.nametable);
+//        }
         patternAddr = ((patternAddr + tileFetch.nametable) << 4) + rowIndex;
         
         uint8_t ptrnLow = ReadFromVRAM(patternAddr);
@@ -295,6 +305,12 @@ void NESDL_PPU::HandleProcessVBlankScanline()
         if (currentScanlineCycle == 1)
         {
             registers.status |= PPUSTATUS_VBLANK;
+            
+            if ((registers.ctrl & PPUCTRL_NMIENABLE) != 0x00)
+            {
+                // Also triggers an NMI (VBlank NMI)
+                core->cpu->nmi = true;
+            }
         }
     }
     else if (currentScanline == 261)
@@ -401,6 +417,7 @@ void NESDL_PPU::HandleProcessVBlankScanline()
             {
 //                tileBuffer[1] = tileBuffer[0];
 //                tileBuffer[0] = tileFetch;
+                registers.v += 1;               // increment coarse X
             }
         }
         else if (currentScanlineCycle < 341)
@@ -511,7 +528,7 @@ void NESDL_PPU::WriteToRegister(uint16_t registerAddr, uint8_t data)
             // Increment v by the amount specified from PPUCTRL bit 2
             if (incrementV)
             {
-                registers.v += (registers.ctrl & PPUCTRL_INCMODE >> 2) == 0 ? 1 : 32;
+                registers.v += (registers.ctrl & PPUCTRL_INCMODE) != 0 ? 32 : 1;
             }
             break;
         case PPU_OAMDMA:

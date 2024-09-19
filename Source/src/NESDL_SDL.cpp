@@ -27,7 +27,7 @@ void NESDL_SDL::SDLInit()
             // Create window texture to draw onto
             texture = SDL_CreateTexture(renderer,
                 SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING,
-                NESDL_SCREEN_HEIGHT, NESDL_SCREEN_WIDTH);
+                NESDL_SCREEN_WIDTH, NESDL_SCREEN_HEIGHT);
             
             // Fill the renderer black on clear
             SDL_SetRenderDrawColor(renderer, 0x00, 0x00, 0x00, 0xFF);

@@ -39,6 +39,18 @@ void NESDL_CPU::Update(uint32_t ppuCycles)
         ppuCycleCounter -= nextInstructionPPUTime;
         RunNextInstruction();
         nextInstructionPPUTime = GetCyclesForNextInstruction();
+        
+        // Handle NMI
+        if (nmi)
+        {
+            nmi = false;
+            nmiReady = true;
+        }
+        else if (nmiReady)
+        {
+            nmiReady = false;
+            NMI();
+        }
     }
 }
 
@@ -1240,12 +1252,15 @@ void NESDL_CPU::OP_PHP(uint8_t opcode, AddrMode mode)
 {
     core->ram->WriteByte(STACK_PTR + (registers.sp--), registers.p);
     
+    // Set break flag
+    SetPSFlag(PSTATUS_BREAK, true);
+    
     AdvanceCyclesForAddressMode(opcode, mode, false, false, false);
 }
 
 void NESDL_CPU::OP_PLA(uint8_t opcode, AddrMode mode)
 {
-    uint8_t stackVal = core->ram->ReadByte(STACK_PTR + (registers.sp++));
+    uint8_t stackVal = core->ram->ReadByte(STACK_PTR + (++registers.sp));
     registers.a = stackVal;
     SetPSFlag(PSTATUS_ZERO, stackVal == 0);
     SetPSFlag(PSTATUS_NEGATIVE, sign((int8_t)stackVal) < 0);
@@ -1255,7 +1270,7 @@ void NESDL_CPU::OP_PLA(uint8_t opcode, AddrMode mode)
 
 void NESDL_CPU::OP_PLP(uint8_t opcode, AddrMode mode)
 {
-    uint8_t stackVal = core->ram->ReadByte(STACK_PTR + (registers.sp++));
+    uint8_t stackVal = core->ram->ReadByte(STACK_PTR + (++registers.sp));
     registers.p = stackVal;
     SetPSFlag(PSTATUS_ZERO, stackVal == 0);
     SetPSFlag(PSTATUS_NEGATIVE, sign((int8_t)stackVal) < 0);
@@ -1324,11 +1339,11 @@ void NESDL_CPU::OP_ROR(uint8_t opcode, AddrMode mode)
 void NESDL_CPU::OP_RTI(uint8_t opcode, AddrMode mode)
 {
     // Pull P from stack
-    uint8_t p = core->ram->ReadByte(STACK_PTR + (registers.sp++));
+    uint8_t p = core->ram->ReadByte(STACK_PTR + (++registers.sp));
     registers.p = p;
     // Pull PC from stack
-    uint16_t pc = core->ram->ReadByte(STACK_PTR + (registers.sp++));
-    pc += core->ram->ReadByte(STACK_PTR + (registers.sp++)) << 8;
+    uint16_t pc = core->ram->ReadByte(STACK_PTR + (++registers.sp));
+    pc += core->ram->ReadByte(STACK_PTR + (++registers.sp)) << 8;
     registers.pc = pc;
     
     AdvanceCyclesForAddressMode(opcode, mode, false, false, false);
@@ -1470,4 +1485,26 @@ void NESDL_CPU::OP_TYA(uint8_t opcode, AddrMode mode)
 void NESDL_CPU::OP_KIL()
 {
     throw domain_error("ILLEGAL OPCODE");
+}
+
+void NESDL_CPU::NMI()
+{
+    // Push PC to stack
+    core->ram->WriteByte(STACK_PTR + (registers.sp--), (registers.pc >> 8));
+    core->ram->WriteByte(STACK_PTR + (registers.sp--), registers.pc);
+    
+    // Set break flag (before pushing P to stack)
+    SetPSFlag(PSTATUS_BREAK, false);
+    
+    // Push P to stack
+    core->ram->WriteByte(STACK_PTR + (registers.sp--), registers.p);
+    
+    // Set interrupt flag
+    SetPSFlag(PSTATUS_INTERRUPTDISABLE, true);
+    
+    // Advance to address specified at NMI location (0xFFFA)
+    registers.pc = core->ram->ReadWord(0xFFFA);
+    
+    // Advance 7 cycles
+    elapsedCycles += 7;
 }

@@ -111,9 +111,12 @@ public:
     void OP_TXS(uint8_t opcode, AddrMode mode);
     void OP_TYA(uint8_t opcode, AddrMode mode);
     void OP_KIL();
+    void NMI();
     
     CPURegisters registers;
     uint64_t elapsedCycles;
+    bool nmi;
+    bool nmiReady;
 private:
 	NESDL_Core* core;
     AddressModeResult* addrModeResult;
