@@ -20,11 +20,13 @@ public:
     void StartSystem();
 	void Update(double deltaTime);
 	void LoadRom(const char* path);
+    void HandleEvent(SDL_EventType eventType, SDL_KeyCode eventKeyCode);
 
-	NESDL_CPU *cpu;
-	NESDL_PPU *ppu;
-	NESDL_RAM *ram;
-	NESDL_APU *apu;
+	NESDL_CPU* cpu;
+	NESDL_PPU* ppu;
+	NESDL_RAM* ram;
+	NESDL_APU* apu;
+    NESDL_Input* input;
 private:
 	double timeSinceStartup;
 };

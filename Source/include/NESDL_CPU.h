@@ -28,8 +28,6 @@ enum AddrMode { IMPLICIT, RELATIVE, ACCUMULATOR, IMMEDIATE,
     ZEROPAGE, ZEROPAGEX, ZEROPAGEY, ABSOLUTE, ABSOLUTEX, ABSOLUTEY,
     INDIRECTX, INDIRECTY };
 
-class NESDL_Core; // Declaration needed for a pointer ref
-
 struct AddressModeResult
 {
     uint16_t address;

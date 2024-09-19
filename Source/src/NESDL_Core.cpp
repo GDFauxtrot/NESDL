@@ -9,10 +9,16 @@ void NESDL_Core::Init()
 	ppu = new NESDL_PPU();
 	ram = new NESDL_RAM();
 	apu = new NESDL_APU();
+    input = new NESDL_Input();
 
 	cpu->Init(this);
     ppu->Init(this);
     ram->Init(this);
+//    apu->Init(this);
+    input->Init(this);
+    
+    // Connect player 1 controller from the start
+    input->SetControllerConnected(true, false);
 
 	timeSinceStartup = 0;
 }
@@ -70,4 +76,9 @@ void NESDL_Core::LoadRom(const char* path)
 	ram->WriteVROMData(vromData->data(), romBankCount); // TODO abstract this to a mapper! Assuming NROM
 
 	file.close();
+}
+
+void NESDL_Core::HandleEvent(SDL_EventType eventType, SDL_KeyCode eventKeyCode)
+{
+    input->RegisterKey(eventKeyCode, eventType == SDL_KEYDOWN);
 }

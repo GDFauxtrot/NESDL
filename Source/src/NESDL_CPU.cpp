@@ -73,9 +73,11 @@ uint8_t NESDL_CPU::GetCyclesForNextInstruction()
     uint64_t prevElapsedCycles = elapsedCycles;
     core->ppu->ignoreChanges = true;
     core->ram->ignoreChanges = true;
+    core->input->ignoreChanges = true;
     RunNextInstruction();
     core->ppu->ignoreChanges = false;
     core->ram->ignoreChanges = false;
+    core->input->ignoreChanges = false;
     registers = regState;
     uint8_t result = elapsedCycles - prevElapsedCycles;
     elapsedCycles = prevElapsedCycles;

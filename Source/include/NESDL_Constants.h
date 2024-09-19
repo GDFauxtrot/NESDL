@@ -2,6 +2,8 @@
 
 using namespace std;
 
+class NESDL_Core; // Decl needed for pointer refs
+
 // Screen dimension constants
 const uint16_t NESDL_SCREEN_WIDTH = 256;
 const uint16_t NESDL_SCREEN_HEIGHT = 240;

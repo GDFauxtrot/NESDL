@@ -90,8 +90,6 @@ struct OAMEntry
 #define OAMATTR_FLIPX       0x40
 #define OAMATTR_FLIPY       0x80
 
-class NESDL_Core; // Declaration needed for a pointer ref
-
 class NESDL_PPU
 {
 public:

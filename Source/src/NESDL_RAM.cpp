@@ -26,10 +26,13 @@ uint8_t NESDL_RAM::ReadByte(uint16_t addr)
     {
         
     }
-    // 0x4016, 0x4017 : Joystick 1/2 input (fun fact: JOY2 WRITE is APU frame counter info! Weird huh
+    // 0x4016, 0x4017 : Joystick 1/2 input
     else if (addr < 0x4018)
     {
-        
+        bool isPlayer2 = addr == 0x4017;
+        // High 3 (or 5?) bytes are open bus, usually containing the upper byte of the controller address
+        // (aka 0x40). Needed for Paperboy as it expects this open bus data, according to NESDEV
+        return 0x40 | core->input->GetNextPlayerInputBit(isPlayer2);
     }
     // APU test functionality + some unfinished hardware functionality (do nothing)
     else if (addr < 0x4020)
@@ -98,7 +101,15 @@ void NESDL_RAM::WriteByte(uint16_t addr, uint8_t data)
     // 0x4016, 0x4017 : Joystick 1/2 input (fun fact: JOY2 WRITE is APU frame counter info! Weird huh
     else if (addr < 0x4018)
     {
-        
+        if (addr == 0x4016)
+        {
+            // Ready controller input data shift registers (we only care about the first bit)
+            core->input->SetReadInputStrobe(data & 0x1);
+        }
+        else
+        {
+            // APU frame counter shenanigans
+        }
     }
     // APU test functionality + some unfinished hardware functionality (do nothing)
     else if (addr < 0x4020)

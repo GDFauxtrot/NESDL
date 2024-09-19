@@ -7,9 +7,7 @@ int main(int argc, char* args[])
     NESDL_SDL sdlCtx;
     sdlCtx.SDLInit();
 
-    // Initialize player input
-
-    // Initialize system
+    // Initialize system (incl. input)
     NESDL_Core core;
     core.Init();
     
@@ -44,6 +42,7 @@ int main(int argc, char* args[])
         
         while (SDL_PollEvent(&e))
         {
+            core.HandleEvent((SDL_EventType)e.type, (SDL_KeyCode)e.key.keysym.sym);
             if (e.type == SDL_QUIT)
             {
                 coreIsRunning = false;

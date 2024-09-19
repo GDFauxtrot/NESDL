@@ -28,15 +28,6 @@ void NESDL_PPU::Init(NESDL_Core* c)
     tileFetch.attribute = 0;
     tileFetch.pattern = 0;
     incrementV = true;
-    
-    // Clear frame buffer before starting
-    for (uint32_t y = 0; y < NESDL_SCREEN_HEIGHT; ++y)
-    {
-        for (uint32_t x = 0; x < NESDL_SCREEN_WIDTH; ++x)
-        {
-            frameData[y * NESDL_SCREEN_HEIGHT + x] = 0;
-        }
-    }
 }
 
 void NESDL_PPU::Update(uint32_t ppuCycles)
