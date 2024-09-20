@@ -63,7 +63,7 @@ void NESDL_CPU::InitializeCPURegisters()
     registers.y = 0;
     registers.pc = 0xFFFC;
     registers.sp = 0xFD;
-    registers.p = PSTATUS_INTERRUPTDISABLE;
+    registers.p = PSTATUS_INTERRUPTDISABLE | PSTATUS_UNDEFINED;
 }
 
 uint8_t NESDL_CPU::GetCyclesForNextInstruction()
@@ -636,14 +636,16 @@ void NESDL_CPU::GetByteForAddressMode(AddrMode mode, AddressModeResult* result)
         case AddrMode::ZEROPAGEX:
         {
             uint8_t addr = core->ram->ReadByte(registers.pc++);
-            result->value = core->ram->ReadByte(addr + registers.x);
+            addr = (addr + registers.x) % 256;
+            result->value = core->ram->ReadByte(addr);
             result->address = addr;
             break;
         }
         case AddrMode::ZEROPAGEY:
         {
             uint8_t addr = core->ram->ReadByte(registers.pc++);
-            result->value = core->ram->ReadByte(addr + registers.y);
+            addr = (addr + registers.y) % 256;
+            result->value = core->ram->ReadByte(addr);
             result->address = addr;
             break;
         }
@@ -658,7 +660,8 @@ void NESDL_CPU::GetByteForAddressMode(AddrMode mode, AddressModeResult* result)
         case AddrMode::ABSOLUTEX:
         {
             uint16_t addr = core->ram->ReadWord(registers.pc);
-            result->value = core->ram->ReadByte(addr + registers.x);
+            addr += registers.x;
+            result->value = core->ram->ReadByte(addr);
             registers.pc += 2;
             result->address = addr;
             break;
@@ -666,7 +669,8 @@ void NESDL_CPU::GetByteForAddressMode(AddrMode mode, AddressModeResult* result)
         case AddrMode::ABSOLUTEY:
         {
             uint16_t addr = core->ram->ReadWord(registers.pc);
-            result->value = core->ram->ReadByte(addr + registers.y);
+            addr += registers.y;
+            result->value = core->ram->ReadByte(addr);
             registers.pc += 2;
             result->address = addr;
             break;
@@ -674,23 +678,23 @@ void NESDL_CPU::GetByteForAddressMode(AddrMode mode, AddressModeResult* result)
         case AddrMode::INDIRECTX:
         {
             uint8_t addr = core->ram->ReadByte(registers.pc++);
-            uint16_t lsb = core->ram->ReadByte(addr + registers.x);
-            uint16_t hsb = core->ram->ReadByte(addr + registers.x + 1) << 8;
+            uint16_t lsb = core->ram->ReadByte((addr + registers.x) % 256);
+            uint16_t hsb = core->ram->ReadByte((addr + registers.x + 1) % 256) << 8;
             result->value = core->ram->ReadByte(hsb + lsb);
-            result->address = addr;
+            result->address = hsb + lsb;
             break;
         }
         case AddrMode::INDIRECTY:
         {
             uint8_t addr = core->ram->ReadByte(registers.pc++);
             uint16_t lsb = core->ram->ReadByte(addr);
-            uint16_t hsb = (core->ram->ReadByte(addr + 1) << 8);
+            uint16_t hsb = (core->ram->ReadByte((addr + 1) % 256) << 8);
             uint16_t resultAddr = hsb + lsb;
             uint16_t targetAddr = resultAddr + registers.y;
             // Trigger an "oops" if this mode crossed page bounds
             core->ram->oops = (resultAddr / 0x100) != (targetAddr / 0x100);
             result->value = core->ram->ReadByte(targetAddr);
-            result->address = addr;
+            result->address = targetAddr;
             break;
         }
     }
@@ -771,24 +775,27 @@ uint8_t NESDL_CPU::GetCyclesForAddressMode(uint8_t opcode, AddrMode mode, bool p
 
 void NESDL_CPU::OP_ADC(uint8_t opcode, AddrMode mode)
 {
-    uint8_t oldAcc = registers.a;
-    uint8_t carry = registers.p & PSTATUS_CARRY;
-    
     GetByteForAddressMode(mode, addrModeResult);
     AdvanceCyclesForAddressMode(opcode, mode, core->ram->oops, false, false);
     
+    // Add A, M and C together to get the result of addition with carry
+    uint8_t oldAcc = registers.a;
     uint8_t val = addrModeResult->value;
-    uint8_t result = oldAcc + val + carry;
+    uint8_t carry = registers.p & PSTATUS_CARRY;
+    uint8_t result = oldAcc + val + carry; // A+M+C
     registers.a = result;
     
-    // If an overflow or underflow was detected, set appropriate flags
-    if (sign((int8_t)oldAcc) == sign((int8_t)val) && val != 0)
-    {
-        if (sign((int8_t)oldAcc) == -sign((int8_t)result))
-        {
-            SetPSFlag(PSTATUS_CARRY & PSTATUS_OVERFLOW, true);
-        }
-    }
+    // Set the flags as a result of this operation
+    
+    // If the result of A+M < A, or (A+M)+C < (A+M), then we have a carry (C)
+    SetPSFlag(PSTATUS_CARRY, (oldAcc + val) < oldAcc || result < (oldAcc + val));
+
+    // Gonna cheat on this one and just check if the value goes beyond the range of an int8
+    // (I'm not terribly clever but it is terribly late and I'm terribly tired)
+    int16_t result16 = (int8_t)oldAcc + (int8_t)val + carry;
+    SetPSFlag(PSTATUS_OVERFLOW, result16 < -128 || result16 > 127);
+    
+    // Set zero and negative flags as usual
     SetPSFlag(PSTATUS_ZERO, result == 0);
     SetPSFlag(PSTATUS_NEGATIVE, sign((int8_t)result) < 0);
 }
@@ -891,8 +898,8 @@ void NESDL_CPU::OP_BIT(uint8_t opcode, AddrMode mode)
     AdvanceCyclesForAddressMode(opcode, mode, false, false, false);
     uint8_t result = registers.a & addrModeResult->value;
     SetPSFlag(PSTATUS_ZERO, result == 0);
-    SetPSFlag(PSTATUS_OVERFLOW, (result & PSTATUS_OVERFLOW) >> 5);
-    SetPSFlag(PSTATUS_NEGATIVE, (result & PSTATUS_NEGATIVE) >> 6);
+    SetPSFlag(PSTATUS_OVERFLOW, (addrModeResult->value & PSTATUS_OVERFLOW) >> 5);
+    SetPSFlag(PSTATUS_NEGATIVE, (addrModeResult->value & PSTATUS_NEGATIVE) >> 6);
 }
 
 void NESDL_CPU::OP_BMI(uint8_t opcode, AddrMode mode)
@@ -1042,7 +1049,8 @@ void NESDL_CPU::OP_CMP(uint8_t opcode, AddrMode mode)
     
     SetPSFlag(PSTATUS_CARRY, registers.a >= addrModeResult->value);
     SetPSFlag(PSTATUS_ZERO, registers.a == addrModeResult->value);
-    SetPSFlag(PSTATUS_NEGATIVE, (int8_t)registers.a < (int8_t)addrModeResult->value);
+    int8_t result = registers.a - addrModeResult->value;
+    SetPSFlag(PSTATUS_NEGATIVE, result < 0);
 }
 
 void NESDL_CPU::OP_CPX(uint8_t opcode, AddrMode mode)
@@ -1052,7 +1060,8 @@ void NESDL_CPU::OP_CPX(uint8_t opcode, AddrMode mode)
     
     SetPSFlag(PSTATUS_CARRY, registers.x >= addrModeResult->value);
     SetPSFlag(PSTATUS_ZERO, registers.x == addrModeResult->value);
-    SetPSFlag(PSTATUS_NEGATIVE, (int8_t)registers.x < (int8_t)addrModeResult->value);
+    int8_t result = registers.x - addrModeResult->value;
+    SetPSFlag(PSTATUS_NEGATIVE, result < 0);
 }
 
 void NESDL_CPU::OP_CPY(uint8_t opcode, AddrMode mode)
@@ -1062,7 +1071,8 @@ void NESDL_CPU::OP_CPY(uint8_t opcode, AddrMode mode)
     
     SetPSFlag(PSTATUS_CARRY, registers.y >= addrModeResult->value);
     SetPSFlag(PSTATUS_ZERO, registers.y == addrModeResult->value);
-    SetPSFlag(PSTATUS_NEGATIVE, (int8_t)registers.y < (int8_t)addrModeResult->value);
+    int8_t result = registers.y - addrModeResult->value;
+    SetPSFlag(PSTATUS_NEGATIVE, result < 0);
 }
 
 void NESDL_CPU::OP_DEC(uint8_t opcode, AddrMode mode)
@@ -1146,7 +1156,18 @@ void NESDL_CPU::OP_JMP(uint8_t opcode, bool indirect)
     uint16_t addr = core->ram->ReadWord(registers.pc);
     if (indirect)
     {
-        addr = core->ram->ReadWord(addr);
+        // Indirect jump has a bug on addresses at the end of pages (eg. 0x##FF) where
+        // the LSB comes from 0x##FF but the HSB comes from 0x##00 (basically a page wrap)
+        if ((addr & 0x00FF) == 0xFF)
+        {
+            uint16_t lsb = core->ram->ReadByte(addr);
+            uint16_t hsb = core->ram->ReadByte(addr & 0xFF00) << 8;
+            addr = hsb + lsb;
+        }
+        else
+        {
+            addr = core->ram->ReadWord(addr);
+        }
         AdvanceCyclesForAddressMode(opcode, AddrMode::ABSOLUTE, false, false, false);
     }
     else
@@ -1252,10 +1273,9 @@ void NESDL_CPU::OP_PHA(uint8_t opcode, AddrMode mode)
 
 void NESDL_CPU::OP_PHP(uint8_t opcode, AddrMode mode)
 {
-    core->ram->WriteByte(STACK_PTR + (registers.sp--), registers.p);
-    
-    // Set break flag
-    SetPSFlag(PSTATUS_BREAK, true);
+    // Break flag pushes as 1 but physically isn't a stored bit (status is a 6 bit register)
+    // Additionally, mysterious bit 6 ("undefined") always pushes to stack as 1 too
+    core->ram->WriteByte(STACK_PTR + (registers.sp--), registers.p | PSTATUS_BREAK | PSTATUS_UNDEFINED);
     
     AdvanceCyclesForAddressMode(opcode, mode, false, false, false);
 }
@@ -1274,8 +1294,8 @@ void NESDL_CPU::OP_PLP(uint8_t opcode, AddrMode mode)
 {
     uint8_t stackVal = core->ram->ReadByte(STACK_PTR + (++registers.sp));
     registers.p = stackVal;
-    SetPSFlag(PSTATUS_ZERO, stackVal == 0);
-    SetPSFlag(PSTATUS_NEGATIVE, sign((int8_t)stackVal) < 0);
+//    SetPSFlag(PSTATUS_ZERO, stackVal == 0);
+//    SetPSFlag(PSTATUS_NEGATIVE, sign((int8_t)stackVal) < 0);
     
     AdvanceCyclesForAddressMode(opcode, mode, false, false, false);
 }
@@ -1363,6 +1383,54 @@ void NESDL_CPU::OP_RTS(uint8_t opcode, AddrMode mode)
 
 void NESDL_CPU::OP_SBC(uint8_t opcode, AddrMode mode)
 {
+    GetByteForAddressMode(mode, addrModeResult);
+    AdvanceCyclesForAddressMode(opcode, mode, core->ram->oops, false, false);
+    
+    // Subtract A, M and (1-C) together to get the result of subtraction with carry
+    uint8_t oldAcc = registers.a;
+    uint8_t val = addrModeResult->value;
+    uint8_t carry = registers.p & PSTATUS_CARRY;
+    uint8_t result = oldAcc - val - (1-carry); // A-M-(1-C)
+    registers.a = result;
+    
+    // Set the flags as a result of this operation
+    
+    // If the result of A+M < A, or (A+M)+C < (A+M), then we have a carry (C)
+    SetPSFlag(PSTATUS_CARRY, (oldAcc + val) < oldAcc || result < (oldAcc + val));
+
+    // Gonna cheat on this one and just check if the value goes beyond the range of an int8
+    // (I'm not terribly clever but it is terribly late and I'm terribly tired)
+    int16_t result16 = (int8_t)oldAcc - (int8_t)val - (1-carry);
+    SetPSFlag(PSTATUS_OVERFLOW, result16 < -128 || result16 > 127);
+    
+    // Set zero and negative flags as usual
+    SetPSFlag(PSTATUS_ZERO, result == 0);
+    SetPSFlag(PSTATUS_NEGATIVE, sign((int8_t)result) < 0);
+    /*
+    GetByteForAddressMode(mode, addrModeResult);
+    AdvanceCyclesForAddressMode(opcode, mode, core->ram->oops, false, false);
+    
+    // Add A, M and C together to get the result of addition with carry
+    uint8_t oldAcc = registers.a;
+    uint8_t val = addrModeResult->value;
+    uint8_t carry = registers.p & PSTATUS_CARRY;
+    uint8_t result = oldAcc - val - (1-carry);
+    registers.a = result;
+    
+    // Set the flags as a result of this operation
+    
+    // If the result of A+M < A, or (A+M)+C < (A+M), then we have a carry (C)
+    SetPSFlag(PSTATUS_CARRY, (oldAcc + val) < oldAcc || result < (oldAcc + val));
+    
+    // Overflow (V) is set when the signed version of these values have overflown into the other sign
+    SetPSFlag(PSTATUS_OVERFLOW, sign((int8_t)oldAcc) != sign((int8_t)result));
+    
+    // Set zero and negative flags as usual
+    SetPSFlag(PSTATUS_ZERO, result == 0);
+    SetPSFlag(PSTATUS_NEGATIVE, sign((int8_t)result) < 0);
+    */
+    
+    /*
     uint8_t oldAcc = registers.a;
     uint8_t carry = registers.p & PSTATUS_CARRY;
     
@@ -1374,15 +1442,19 @@ void NESDL_CPU::OP_SBC(uint8_t opcode, AddrMode mode)
     registers.a = result;
     
     // If an overflow or underflow was detected, set appropriate flags
+    SetPSFlag(PSTATUS_CARRY & PSTATUS_OVERFLOW, false);
     if (sign((int8_t)oldAcc) == sign((int8_t)val) && val != 0)
     {
-        if (sign((int8_t)oldAcc) == -sign((int8_t)result))
+        if (sign((int8_t)oldAcc) != sign((int8_t)result))
         {
-            SetPSFlag(PSTATUS_CARRY & PSTATUS_OVERFLOW, true);
+//            SetPSFlag(PSTATUS_CARRY, false);
+            SetPSFlag(PSTATUS_OVERFLOW, true);
         }
     }
+    SetPSFlag(PSTATUS_CARRY, result > oldAcc);
     SetPSFlag(PSTATUS_ZERO, result == 0);
     SetPSFlag(PSTATUS_NEGATIVE, sign((int8_t)result) < 0);
+     */
 }
 
 void NESDL_CPU::OP_SEC(uint8_t opcode, AddrMode mode)
