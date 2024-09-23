@@ -36,20 +36,24 @@ void NESDL_CPU::Update(uint32_t ppuCycles)
     ppuCycleCounter += ppuCycles;
     while (ppuCycleCounter > nextInstructionPPUTime)
     {
-        ppuCycleCounter -= nextInstructionPPUTime;
-        RunNextInstruction();
-        nextInstructionPPUTime = GetCyclesForNextInstruction();
-        
         // Handle NMI
         if (nmi)
         {
+            
             nmi = false;
-            nmiReady = true;
-        }
-        else if (nmiReady)
-        {
-            nmiReady = false;
+//            nmiReady = true;
             NMI();
+        }
+//        else if (nmiReady)
+//        {
+//            nmiReady = false;
+//            NMI();
+//        }
+        else
+        {
+            ppuCycleCounter -= nextInstructionPPUTime;
+            RunNextInstruction();
+            nextInstructionPPUTime = GetCyclesForNextInstruction() * 3;
         }
     }
 }

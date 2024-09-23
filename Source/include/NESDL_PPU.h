@@ -1,19 +1,5 @@
 #pragma once
 
-// The documented registers of the PPU provided in one struct for organization
-//struct PPURegisters
-//{
-//    uint8_t ctrl;       // PPU control register
-//    uint8_t mask;       // PPU mask register
-//    uint8_t status;     // PPU status register
-//    uint8_t oamAddr;    // OAM address port
-//    uint8_t oamData;    // OAM data port
-//    uint8_t scroll;     // PPU scroll position register
-//    uint16_t addr;       // PPU address register
-//    uint8_t data;       // PPU data port
-//    uint8_t oamDMA;     // OAM DMA register
-//};
-
 struct PPURegisters
 {
     // Internal registers
@@ -27,6 +13,7 @@ struct PPURegisters
     uint8_t ctrl; // PPU control register
     uint8_t mask; // PPU mask register
     uint8_t status;     // PPU status register
+    uint8_t oamAddr;    // OAM address
 };
 
 // The bytes collected during PPU tile fetching
@@ -84,11 +71,10 @@ struct OAMEntry
 #define PPUSTATUS_VBLANK        0x80
 
 // OAM attributes flags
-#define OAMATTR_PALETTE_L   0x1
-#define OAMATTR_PALETTE_H   0x2
-#define OAMATTR_PRIORITY    0x20
-#define OAMATTR_FLIPX       0x40
-#define OAMATTR_FLIPY       0x80
+#define SPR_PALETTE     0x3
+#define SPR_PRIORITY    0x20
+#define SPR_FLIPX       0x40
+#define SPR_FLIPY       0x80
 
 class NESDL_PPU
 {
@@ -124,5 +110,10 @@ private:
     PPUTileFetch tileFetch;
     PPUTileFetch tileBuffer[2]; // Representation of the tile data sitting in shift registers
     uint8_t ppuDataReadBuffer; // Special internal buffer for PPUDATA reads
-    OAMEntry oam[64]; // 64 slots (256 bytes) for PPU "Object Attribute Memory"
+    uint8_t oam[256]; // 64 slots (256 bytes) for PPU "Object Attribute Memory"
+    uint8_t secondaryOAM[32]; // 8 slots (32 bytes) of next scanline's chosen sprites
+    uint8_t oamN; // N counter for OAM writes (as described on NESDEV sprite evaluation)
+    uint8_t oamM; // M counter for OAM writes
+    uint8_t secondaryOAMNextSlot; // Index for the next available slot in secondary OAM
+    uint8_t sprFetchIndex; // The index of the sprite to access during secondary OAM sprite fetching
 };
