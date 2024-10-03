@@ -16,5 +16,4 @@ public:
 private:
     NESDL_Core* core;
 	uint8_t ram[0x10000]; // 64KB address space
-    uint8_t* vromData;
 };

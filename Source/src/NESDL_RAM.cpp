@@ -148,6 +148,7 @@ void NESDL_RAM::WriteROMData(uint8_t* addr, uint8_t bankCount)
 void NESDL_RAM::WriteVROMData(uint8_t* addr, uint8_t bankCount)
 {
     // TODO assume NROM, implement bank switching and all that fun mapper stuff later!
-    WriteBytes(0x6000, addr, bankCount * 0x2000);
+//    WriteBytes(0x6000, addr, bankCount * 0x2000);
+//    core->ppu->WriteCHRROM(addr);
 }
 

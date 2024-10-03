@@ -81,11 +81,41 @@ void NESDL_PPU::RunNextCycle()
         currentScanline = 0;
         currentFrame++;
     }
+    
+    posInScanline = elapsedCycles % 341;
+}
+
+void memset32(void* dest, uint32_t value, uintptr_t size)
+{
+    uintptr_t i;
+    for(i = 0; i < (size & (~3)); i += 4)
+    {
+        memcpy(((char*)dest) + i, &value, 4);
+    }
 }
 
 void NESDL_PPU::HandleProcessVisibleScanline()
 {
     uint16_t currentScanlineCycle = elapsedCycles % 341; // TODO un-magic this number
+    
+    if (currentScanline == 0 && currentScanlineCycle == 0)
+    {
+        
+        // Set background color to palette color at 0x3F00
+//        uint32_t p = GetPalette(0,false);
+//        uint32_t c = GetColor(0,p,0);
+//        memset32(frameData, c, sizeof(frameData));
+        
+        if ((registers.mask & PPUMASK_BGENABLE) != 0x00)
+        {
+            // THE ONLY TIME we advance the cycle count artificially - this cycle is skipped
+            // when the frame count is odd (counting by 0)
+            if (currentFrame % 2 == 0)
+            {
+                elapsedCycles++;
+            }
+        }
+    }
     
     // TILE LOGIC - don't run if BG rendering is disabled
     if ((registers.mask & PPUMASK_BGENABLE) != 0x00)
@@ -93,17 +123,17 @@ void NESDL_PPU::HandleProcessVisibleScanline()
         // Every 8 pixels (skipping px 0) we repeat the same process for tiles
         uint8_t pixelInFetchCycle = currentScanlineCycle % 8;
         
-        if (currentScanlineCycle == 0)
-        {
-            // THE ONLY TIME we advance the cycle count artificially - this cycle is skipped
-            // when the frame count is odd
-            if (currentFrame % 2 == 1)
-            {
-                elapsedCycles++;
-            }
-        }
-        else if (currentScanlineCycle < 256)
-//        if (currentScanlineCycle < 256)
+//        if (currentScanlineCycle == 0 && (registers.mask & PPUMASK_SPRENABLE) != 0x00)
+//        {
+//            // THE ONLY TIME we advance the cycle count artificially - this cycle is skipped
+//            // when the frame count is odd (counting by 0)
+//            if (currentFrame % 2 == 0)
+//            {
+//                elapsedCycles++;
+//            }
+//        }
+//        else if (currentScanlineCycle < 256)
+        if (currentScanlineCycle > 0 && currentScanlineCycle < 256)
         {
             FetchAndStoreTile(); // Runs across multiple cycles in order to achieve this
             
@@ -203,7 +233,7 @@ void NESDL_PPU::HandleProcessVisibleScanline()
         if (currentScanlineCycle < 64)
         {
         }
-        if (currentScanlineCycle == 64)
+        else if (currentScanlineCycle == 64)
         {
             memset(secondaryOAM, 0xFF, sizeof(secondaryOAM));
             // Reset counters and flags before sprite evaluation
@@ -234,7 +264,7 @@ void NESDL_PPU::HandleProcessVisibleScanline()
                     // to the next slot
                     uint8_t sprY = secondaryOAM[secondaryOAMNextSlot*4];
                     uint8_t sprHeight = (registers.ctrl & PPUCTRL_SPRHEIGHT) != 0x00 ? 16 : 8;
-                    if (currentScanlineCycle >= sprY+1 && currentScanlineCycle < (sprY+1) + sprHeight)
+                    if (currentScanline >= sprY+1 && currentScanline < (sprY+1) + sprHeight)
                     {
                         // Sprite in range - copy the rest of the data to secondary OAM
                         for (int i = 1; i < 4; ++i)
@@ -290,7 +320,7 @@ void NESDL_PPU::HandleProcessVisibleScanline()
                     
                     // Find out where we'll be starting to render on this line
                     uint16_t sprStartX = (currentScanline * PPU_WIDTH) + sprX;
-                    uint16_t sprRow = currentScanline - (sprY-1) % (sprIs8By16 ? 16 : 8);
+                    uint16_t sprRow = (currentScanline - sprY - 1) % (sprIs8By16 ? 16 : 8);
                     
                     // Flip tile read if the sprite's vertical flip bit is set
                     if (sprFlipVertical)
@@ -329,8 +359,7 @@ void NESDL_PPU::HandleProcessVisibleScanline()
                         uint8_t index = sprFlipHorizontal ? (7-i) : i;
                         
                         // Get pixel position on the scanline + loop X offset
-                        uint16_t currentPixel = (currentScanline * PPU_WIDTH) + sprX;
-                        currentPixel += index;
+                        uint16_t currentPixel = sprStartX + index;
                         
                         // We're going out of bounds on screen - return early
                         if (currentPixel >= (PPU_WIDTH * PPU_HEIGHT))
@@ -351,6 +380,12 @@ void NESDL_PPU::HandleProcessVisibleScanline()
                             // TODO need a better way to detect this? Some tiles may use the same color
                             // as 0x3F00 but not be transparent. Curious how the NES does this w/o
                             // multiple screen buffers
+                            
+                            // If this is sprite zero, mark that we rendered it at least one pixel!
+                            if (sprFetchIndex == 0)
+                            {
+                                registers.status |= PPUSTATUS_SPR0HIT;
+                            }
                         }
                         
                         frameData[currentPixel] = color;
@@ -450,13 +485,16 @@ void NESDL_PPU::HandleProcessVBlankScanline()
         // Set VBLANK FLAG at this exact moment (241, 1)
         if (currentScanlineCycle == 1)
         {
-            registers.status |= PPUSTATUS_VBLANK;
-            
-            if ((registers.ctrl & PPUCTRL_NMIENABLE) != 0x00)
+            if (!disregardVBL)
+            {
+                registers.status |= PPUSTATUS_VBLANK;
+            }
+            if (!disregardNMI && (registers.ctrl & PPUCTRL_NMIENABLE) != 0x00)
             {
                 // Also triggers an NMI (VBlank NMI)
                 core->cpu->nmi = true;
             }
+            disregardVBL = false;
         }
         if (currentScanlineCycle == 7)
         {
@@ -584,6 +622,75 @@ void NESDL_PPU::HandleProcessVBlankScanline()
     }
 }
 
+void NESDL_PPU::PreprocessPPUForReadInstructionTiming(uint8_t instructionPPUTime)
+{
+    uint32_t cyclesThisFrame = (currentScanline * 341) + posInScanline;
+    uint32_t cyclesAfterInstruction = cyclesThisFrame + instructionPPUTime;
+    uint32_t setTarget = ((241 * 341) + 1);
+    uint32_t clearTarget = ((261 * 341) + 1);
+    
+    // If we're before PPU cycle (241,1) and the next CPU instruction occurs when we pass over this cycle,
+    // just set the VBL flag right away
+//    if (cyclesThisFrame < target && cyclesThisFrame + instructionPPUTime >= target)
+//    {
+//        // Race condition - "Reading PPUSTATUS within two cycles of the start of VBL will return 0" (ouch)
+//        if (cyclesThisFrame < (target-1))
+//        {
+//            registers.status |= PPUSTATUS_VBLANK;
+//            if ((registers.ctrl & PPUCTRL_NMIENABLE) != 0x00)
+//            {
+//                // Also triggers an NMI (VBlank NMI)
+//                core->cpu->nmi = true;
+//            }
+//            vblAlreadyHappened = true;
+//        }
+//        else
+//        {
+//            disregardVBL = true;
+//        }
+//    }
+    if (!disregardVBL)
+    {
+        // Extra-specific timing thing - if we're reading ON (241,1), the PPU hasn't run a step yet. So let's just... VBL
+        if (cyclesThisFrame == setTarget)
+        {
+            registers.status |= PPUSTATUS_VBLANK;
+        }
+        if (cyclesThisFrame < setTarget && cyclesAfterInstruction >= (setTarget-1))
+        {
+            // Some weird VBL race conditions:
+            
+            // 1) Reading target-1 results in no VBL, no NMI
+            if (cyclesAfterInstruction == setTarget-1)
+            {
+                registers.status &= ~PPUSTATUS_VBLANK;
+                disregardVBL = true;
+                disregardNMI = true;
+            }
+            // 2) Reading target or target+1 results in a VBL but no NMI
+            else if (cyclesAfterInstruction == setTarget || cyclesAfterInstruction == setTarget+1)
+            {
+                registers.status |= PPUSTATUS_VBLANK;
+                disregardVBL = true;
+                disregardNMI = true;
+            }
+            // Reading 2+ frames around VBL results in normal behavior
+            else
+            {
+                registers.status |= PPUSTATUS_VBLANK;
+                disregardVBL = true;
+                disregardNMI = false;
+            }
+        }
+        // Another edge case - we crossed over (261,1) on read, so by this point, the VBL flag should be cleared (among others)
+        else if (cyclesThisFrame < clearTarget && cyclesAfterInstruction >= clearTarget)
+        {
+            registers.status &= 0x1F;
+        }
+    }
+    
+}
+
 void NESDL_PPU::WriteToRegister(uint16_t registerAddr, uint8_t data)
 {
     // Do not allow writes when the PPU is still warming up
@@ -673,7 +780,8 @@ void NESDL_PPU::WriteToRegister(uint16_t registerAddr, uint8_t data)
             // DMA write is a very involved process - the CPU is halted while RAM is transferred to OAM.
             // Since we're an emulator and the STA/X instruction is still running, if we alter
             // the CPU's elapsed cycle count now it will effectively halt the very next instruction
-            core->cpu->elapsedCycles += core->cpu->elapsedCycles % 2 == 0 ? 513 : 514;
+//            core->cpu->HaltCPUForDMAWrite();
+            core->cpu->dmaDelayNextFrame = true;
             // Transfer data from 0x##00 - 0x##FF
             uint16_t targetAddr = data << 8;
             for (int i = 0; i < 256; ++i)
@@ -717,7 +825,7 @@ uint8_t NESDL_PPU::ReadFromRegister(uint16_t registerAddr)
                     registers.w = false;
                     uint8_t output = registers.status;
                     // Also reset VBLANK on read
-                    registers.status &= 0x7F;
+                    registers.status &= ~PPUSTATUS_VBLANK;
                     // TODO emulate "PPU stale bus contents" for some flimsily copy-protected titles
                     return output;
                 }
@@ -744,15 +852,22 @@ uint8_t NESDL_PPU::ReadFromRegister(uint16_t registerAddr)
                 }
                 else
                 {
-                    uint8_t vramData = ppuDataReadBuffer;
-                    ppuDataReadBuffer = ReadFromVRAM(registers.v);
-                    // TODO support palette RAM reading rules ( it's complicated, see: https://www.nesdev.org/wiki/PPU_registers#Reading_palette_RAM )
-                    // Increment v by the amount specified from PPUCTRL bit 2
-                    if (incrementV)
+                    if (registers.v >= 0x3F00)
                     {
-                        registers.v += (registers.ctrl & PPUCTRL_INCMODE >> 2) == 0 ? 1 : 32;
+                        return ReadFromVRAM(registers.v);
                     }
-                    return vramData;
+                    else
+                    {
+                        uint8_t vramData = ppuDataReadBuffer;
+                        ppuDataReadBuffer = ReadFromVRAM(registers.v);
+                        // TODO support palette RAM reading rules ( it's complicated, see: https://www.nesdev.org/wiki/PPU_registers#Reading_palette_RAM )
+                        // Increment v by the amount specified from PPUCTRL bit 2
+                        if (incrementV)
+                        {
+                            registers.v += (registers.ctrl & PPUCTRL_INCMODE >> 2) == 0 ? 1 : 32;
+                        }
+                        return vramData;
+                    }
                 }
             }
             break;
@@ -769,12 +884,12 @@ uint8_t NESDL_PPU::ReadFromVRAM(uint16_t addr)
     // Depending on mirroring, we return values different
     // TODO assuming horizontal mirroring for now!
     
-    // Accessing pattern tables from cartridge (0x6000-0x7FFF mapped to CPU)
+    // Accessing CHR ROM/RAM data from cartridge
     if (addr < 0x2000)
     {
-        return core->ram->ReadByte(addr + 0x6000);
+        return chrData[addr];
     }
-    // Mirrored address space(s)
+    // Mirrored address space(s) 0x3000-0x3EFF -> 0x2000-0x2EFF
     if (addr >= 0x3000 && addr < 0x3F00)
     {
         addr -= 0x1000;
@@ -804,7 +919,8 @@ void NESDL_PPU::WriteToVRAM(uint16_t addr, uint8_t data)
 {
     if (addr < 0x2000)
     {
-        // Read-only ROM data - ignore
+        // Read-only ROM data - ignore (for now - TODO implement CHR-RAM)
+        chrData[addr] = data;
         return;
     }
     // Mirrored address space(s)
@@ -828,8 +944,19 @@ void NESDL_PPU::WriteToVRAM(uint16_t addr, uint8_t data)
     }
     else if (addr >= 0x3F00)
     {
-        paletteData[addr - 0x3F00] = data;
+        uint16_t index = (addr - 0x3F00) % 0x20;
+        paletteData[index] = data;
+        // Palette data for color index 0 is mirrored across both BG and sprite palettes
+        if (index % 4 == 0)
+        {
+            paletteData[index >= 0x10 ? (index-0x10) : (index+0x10)] = data;
+        }
     }
+}
+
+void NESDL_PPU::WriteCHRROM(uint8_t* addr)
+{
+    memcpy(chrData, addr, sizeof(chrData));
 }
 
 uint16_t NESDL_PPU::WeavePatternBits(uint8_t low, uint8_t high)
@@ -851,8 +978,8 @@ uint16_t NESDL_PPU::WeavePatternBits(uint8_t low, uint8_t high)
 uint32_t NESDL_PPU::GetPalette(uint8_t index, bool spriteLayer)
 {
     uint8_t i = spriteLayer ? (index * 4) + 0x10 : (index * 4);
-    // Return the 4 bytes corresponding to this index
-    return paletteData[i] << 24 | paletteData[i+1] << 16 | paletteData[i+2] << 8 | paletteData[i+3];
+    // Return the 4 bytes corresponding to this index (first color is backdrop unless under certain circumstances)
+    return paletteData[spriteLayer ? 0x10 : 0] << 24 | paletteData[i+1] << 16 | paletteData[i+2] << 8 | paletteData[i+3];
 }
 
 uint32_t NESDL_PPU::GetColor(uint16_t pattern, uint32_t palette, uint8_t pixelIndex)
@@ -863,6 +990,39 @@ uint32_t NESDL_PPU::GetColor(uint16_t pattern, uint32_t palette, uint8_t pixelIn
     // Take this 0-3 index and select the palette byte
     uint32_t paletteShifted = palette >> (24 - patternBits*8);
     uint8_t paletteIndex = paletteShifted & 0xFF;
+    if ((registers.mask & PPUMASK_GREYSCALE) != 0x00) // Only select from four greyscale palette values
+    {
+        paletteIndex &= 0x30;
+    }
     // Get color from palette index!
-    return NESDL_PALETTE[paletteIndex];
+    uint32_t resultColor = NESDL_PALETTE[paletteIndex];
+//    if ((registers.mask & (PPUMASK_TINT_R | PPUMASK_TINT_G | PPUMASK_TINT_B)) != 0x00)
+//    {
+//        // Tint result colors if needed
+//        uint8_t r = (resultColor & 0xFF0000) >> 16;
+//        uint8_t g = (resultColor & 0x00FF00) >> 8;
+//        uint8_t b = (resultColor & 0x0000FF);
+//        if ((registers.mask & PPUMASK_TINT_R) != 0x00)
+//        {
+//            r /= 0.816328;
+//            g *= 0.816328;
+//            b *= 0.816328;
+//        }
+//        if ((registers.mask & PPUMASK_TINT_G) != 0x00)
+//        {
+//            r *= 0.816328;
+//            g /= 0.816328;
+//            b *= 0.816328;
+//        }
+//        if ((registers.mask & PPUMASK_TINT_B) != 0x00)
+//        {
+//            r *= 0.816328;
+//            g *= 0.816328;
+//            b /= 0.816328;
+//        }
+//        resultColor = MakeColor(r, g, b);
+//    }
+    
+    
+    return resultColor;
 }

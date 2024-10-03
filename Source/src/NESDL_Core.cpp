@@ -68,20 +68,20 @@ void NESDL_Core::LoadRom(const char* path)
 	// Read off the 16KB allocated PRG-ROM banks
     if (romBankCount > 0)
     {
-        unique_ptr<vector<uint8_t>> romData = make_unique<vector<uint8_t>>(romBankCount * 0x4000);
-        file.read((char*)romData->data(), romBankCount * 0x4000);
-        ram->WriteROMData(romData->data(), romBankCount); // TODO abstract this to a mapper! Assuming NROM
+        prgROM = make_shared<vector<uint8_t>>(romBankCount * 0x4000);
+        file.read((char*)prgROM->data(), romBankCount * 0x4000);
+        ram->WriteROMData(prgROM->data(), romBankCount); // TODO abstract this to a mapper! Assuming NROM
     }
 
 	// Read off the 8KB allocated CHR-ROM banks
     if (vromBankCount > 0)
     {
-        unique_ptr<vector<uint8_t>> vromData = make_unique<vector<uint8_t>>(vromBankCount * 0x2000);
-        file.read((char*)vromData->data(), vromBankCount * 0x2000);
-        ram->WriteVROMData(vromData->data(), romBankCount); // TODO abstract this to a mapper! Assuming NROM
+        chrROM = make_shared<vector<uint8_t>>(vromBankCount * 0x2000);
+        file.read((char*)chrROM->data(), vromBankCount * 0x2000);
+        ppu->WriteCHRROM(chrROM->data()); // TODO abstract this to a mapper! Assuming NROM (no bankswitches, 1 bank only)
+//        ram->WriteVROMData(chrROM->data(), romBankCount);
     }
 	
-
 	file.close();
 }
 

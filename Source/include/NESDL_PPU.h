@@ -91,20 +91,25 @@ public:
     uint8_t ReadFromRegister(uint16_t registerAddr);
     uint8_t ReadFromVRAM(uint16_t addr);
     void WriteToVRAM(uint16_t addr, uint8_t data);
+    void WriteCHRROM(uint8_t* addr);
     void FetchAndStoreTile();
     uint16_t WeavePatternBits(uint8_t low, uint8_t high);
     uint32_t GetPalette(uint8_t index, bool spriteLayer);
     uint32_t GetColor(uint16_t pattern, uint32_t palette, uint8_t pixelIndex);
+    void PreprocessPPUForReadInstructionTiming(uint8_t instructionPPUTime);
     PPURegisters registers;
     uint32_t frameData[NESDL_SCREEN_WIDTH * NESDL_SCREEN_HEIGHT]; // Frame buffer
     bool ignoreChanges;
     bool incrementV;
     uint64_t currentFrame;
+    uint16_t posInScanline;
+    uint16_t currentScanline;
 private:
     NESDL_Core* core;
     uint64_t elapsedCycles;
     uint16_t currentDrawX;
-    uint16_t currentScanline;
+//    uint16_t currentScanline;
+    uint8_t chrData[0x2000]; // 8KB (at a time) of CHR-ROM/RAM memory
     uint8_t vram[0x1000];  // 4kb VRAM for the PPU (physically 2kb on stock but supports 4 nametables)
     uint8_t paletteData[0x20]; // Bit of space at the end of VRAM address space for palette data
     PPUTileFetch tileFetch;
@@ -116,4 +121,6 @@ private:
     uint8_t oamM; // M counter for OAM writes
     uint8_t secondaryOAMNextSlot; // Index for the next available slot in secondary OAM
     uint8_t sprFetchIndex; // The index of the sprite to access during secondary OAM sprite fetching
+    bool disregardVBL;
+    bool disregardNMI;
 };

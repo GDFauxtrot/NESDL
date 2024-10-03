@@ -29,4 +29,7 @@ public:
     NESDL_Input* input;
 private:
 	double timeSinceStartup;
+    // Populated on ROM load
+    shared_ptr<vector<uint8_t>> prgROM;
+    shared_ptr<vector<uint8_t>> chrROM;
 };

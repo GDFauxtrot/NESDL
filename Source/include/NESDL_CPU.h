@@ -42,14 +42,13 @@ public:
 	void Update(uint32_t ppuCycles);
     void InitializeCPURegisters();
 	void RunNextInstruction();
-	uint64_t MillisecondsToCPUCycles(double ms);
-	double CPUCyclesToMilliseconds(uint64_t c);
     void SetPSFlag(PStatusFlag flag, bool on);
     void GetByteForAddressMode(AddrMode mode, AddressModeResult* result);
     void AdvanceCyclesForAddressMode(uint8_t opcode, AddrMode mode, bool pageCross, bool extraCycles, bool relSuccess);
     uint8_t GetCyclesForAddressMode(uint8_t opcode, AddrMode mode, bool pageCross, bool extraCycles, bool relSuccess);
     uint8_t GetCyclesForNextInstruction();
-    bool HasAddressPageBeenCrossed(uint16_t addr1, uint16_t addr2);
+    uint8_t GetNextInstructionByte();
+    void HaltCPUForDMAWrite();
     
     // All opcode declarations
     void OP_ADC(uint8_t opcode, AddrMode mode);
@@ -114,9 +113,13 @@ public:
     CPURegisters registers;
     uint64_t elapsedCycles;
     bool nmi;
-    bool nmiReady;
+    bool delayNMI;
+    bool dmaDelayNextFrame;
+    bool dmaDelay;
 private:
+    uint8_t nextInstruction;
+    bool nextInstructionSet;
 	NESDL_Core* core;
     AddressModeResult* addrModeResult;
-    int32_t ppuCycleCounter;
+    int16_t ppuCycleCounter;
 };
