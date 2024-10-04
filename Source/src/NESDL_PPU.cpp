@@ -652,6 +652,7 @@ void NESDL_PPU::WriteToRegister(uint16_t registerAddr, uint8_t data)
             if ((registers.status & PPUSTATUS_VBLANK) != 0x00 && (registers.ctrl & PPUCTRL_NMIENABLE) == 0x00 && (data & PPUCTRL_NMIENABLE) != 0x00)
             {
                 core->cpu->nmi = true;
+                core->cpu->delayNMI = true;
             }
             registers.ctrl = data;
             // Write nametable bits to register t
@@ -856,7 +857,6 @@ uint8_t NESDL_PPU::ReadFromVRAM(uint16_t addr)
                 addr -= 0x400;
             }
         }
-        addr = 0x2000 | (addr % 0x800);
         return vram[addr - 0x2000];
     }
     else if (addr >= 0x3F00)
@@ -871,7 +871,7 @@ void NESDL_PPU::WriteToVRAM(uint16_t addr, uint8_t data)
     if (addr < 0x2000)
     {
         // Read-only ROM data - ignore (for now - TODO implement CHR-RAM)
-        chrData[addr] = data;
+//        chrData[addr] = data;
         return;
     }
     // Mirrored address space(s)

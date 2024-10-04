@@ -711,10 +711,12 @@ void NESDL_CPU::AdvanceCyclesForAddressMode(uint8_t opcode, AddrMode mode, bool 
     if (opcode == 0x4C)
     {
         elapsedCycles += 3;
+        return;
     }
     if (opcode == 0x6C)
     {
         elapsedCycles += 5;
+        return;
     }
     switch (mode)
     {
@@ -737,8 +739,10 @@ void NESDL_CPU::AdvanceCyclesForAddressMode(uint8_t opcode, AddrMode mode, bool 
                 case 0x00:
                     elapsedCycles += 7;
                     break;
+                default:
+                    elapsedCycles += 2;
+                    break;
             }
-            elapsedCycles += 2;
             break;
         case ZEROPAGE:
             elapsedCycles += 3 + (extraCycles ? 2 : 0);

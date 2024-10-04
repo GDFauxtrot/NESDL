@@ -110,9 +110,9 @@ public:
     uint64_t elapsedCycles;
     CPURegisters registers;
     bool nmi;
+    bool delayNMI;
     bool dma;
 private:
-    bool delayNMI;
     bool delayedDMA;
 	NESDL_Core* core;
     AddressModeResult* addrModeResult;
