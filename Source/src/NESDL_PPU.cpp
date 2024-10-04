@@ -77,6 +77,10 @@ void NESDL_PPU::HandleProcessVisibleScanline()
         }
     }
     
+    // There is one case where, since tile then sprite rendering occurs in that order, a sliver of sprite data can
+    // poke through tile despite giving tile priority. This check ensures that on this special cycle, that doesn't happen
+    bool bgPriorityThisCycle = false;
+    
     // TILE LOGIC - don't run if BG rendering is disabled
     if ((registers.mask & PPUMASK_BGENABLE) != 0x00)
     {
@@ -107,8 +111,12 @@ void NESDL_PPU::HandleProcessVisibleScanline()
                 {
                     uint16_t currentPixel = (currentScanline * PPU_WIDTH) + currentDrawX;
                     
-                    // Don't render if we wrote a sprite pixel (w/ priority) here!
-                    if ((frameDataSprite[currentPixel] & 0xC0) == 0)
+                    // Don't render if we wrote a sprite pixel here, unless the BG tile has priority
+                    uint8_t patternBits = GetPatternBits(toRender.pattern, i);
+                    bool bgPriority = (frameDataSprite[currentPixel] & 0x80) != 0x00;
+                    bool bgOverSprite = bgPriority && patternBits != 0x00;
+                    bool sprDrawn = (frameDataSprite[currentPixel] & 0x40) != 0x00;
+                    if (bgOverSprite || !sprDrawn)
                     {
                         uint32_t palette = GetPalette(toRender.paletteIndex, false);
                         uint32_t color = GetColor(toRender.pattern, palette, i);
@@ -118,6 +126,10 @@ void NESDL_PPU::HandleProcessVisibleScanline()
 //                            color += 0x00202020;
 //                        }
                         frameData[currentPixel] = color;
+                        if (patternBits != 0x00)
+                        {
+                            bgPriorityThisCycle = true;
+                        }
                     }
                     currentDrawX++;
                 }
@@ -150,12 +162,20 @@ void NESDL_PPU::HandleProcessVisibleScanline()
                     {
                         uint16_t currentPixel = (currentScanline * PPU_WIDTH) + currentDrawX;
                         
-                        // Don't render if we wrote a sprite pixel (w/ priority) here!
-                        if ((frameDataSprite[currentPixel] & 0xC0) == 0)
+                        // Don't render if we wrote a sprite pixel here, unless the BG tile has priority
+                        uint8_t patternBits = GetPatternBits(toRender.pattern, i);
+                        bool bgPriority = (frameDataSprite[currentPixel] & 0x80) != 0x00;
+                        bool bgOverSprite = bgPriority && patternBits != 0x00;
+                        bool sprDrawn = (frameDataSprite[currentPixel] & 0x40) != 0x00;
+                        if (bgOverSprite || !sprDrawn)
                         {
                             uint32_t palette = GetPalette(toRender.paletteIndex, false);
                             uint32_t color = GetColor(toRender.pattern, palette, i);
                             frameData[currentPixel] = color;
+                            if (patternBits != 0x00)
+                            {
+                                bgPriorityThisCycle = true;
+                            }
                         }
                         currentDrawX++;
                         i++;
@@ -264,11 +284,11 @@ void NESDL_PPU::HandleProcessVisibleScanline()
                     
                     if (sprData.bgPriority)
                     {
-                        // TODO we DO need a better way to do this - bgPriority sprites are currently
-                        // being rendered very oddly, it's working but flickering every other frame
+                        frameDataSprite[currentPixel] = 0x80 | (frameDataSprite[currentPixel] & 0x7F);
                         
-                        // We may discard this pixel if the tile takes priority
-                        if (frameData[currentPixel] != NESDL_PALETTE[paletteData[0]])
+                        // Skip if we also drew a tile on this cycle, before we set the priority data,
+                        // but we know the tile sprite wasn't backdrop (aka the tile takes priority)
+                        if (bgPriorityThisCycle)
                         {
                             continue;
                         }
@@ -277,7 +297,7 @@ void NESDL_PPU::HandleProcessVisibleScanline()
                     // We finally get to draw the pixel!
                     
                     // Write a bit signifying that we wrote a SPR pixel here
-                    frameDataSprite[currentPixel] = 0x40 | (sprData.oamIndex & 0x3F);
+                    frameDataSprite[currentPixel] = 0x40 | (frameDataSprite[currentPixel] & 0xBF);
                     
                     uint32_t palette = GetPalette(sprData.paletteIndex, true);
                     uint32_t color = GetColor(sprData.pattern, palette, index);
