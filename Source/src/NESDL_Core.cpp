@@ -42,7 +42,6 @@ void NESDL_Core::Update(double deltaTime)
 void NESDL_Core::StartSystem()
 {
     cpu->Start();
-//    ppu->Start();
 }
 
 void NESDL_Core::LoadRom(const char* path)
@@ -79,7 +78,6 @@ void NESDL_Core::LoadRom(const char* path)
         chrROM = make_shared<vector<uint8_t>>(vromBankCount * 0x2000);
         file.read((char*)chrROM->data(), vromBankCount * 0x2000);
         ppu->WriteCHRROM(chrROM->data()); // TODO abstract this to a mapper! Assuming NROM (no bankswitches, 1 bank only)
-//        ram->WriteVROMData(chrROM->data(), romBankCount);
     }
 	
 	file.close();

@@ -1,24 +1,5 @@
 #include "NESDL.h"
 
-// TODO okay so as I understand it, we need to do the following to get the PPU running:
-// 1) Boot up PPU along with CPU, initialize with values figured out from NESDEV
-// 2) Up to a certain amount of frames from start, we disable writes on some registers
-//   along with other behaviors
-// 3) Once the PPU is "warmed up", we enable register writes
-// 4) From the start of the system, we go through the drawing process, drawing lines horizontally
-//   and firing HBLANK IRQ's at the end of each line draw. There is a delay between each line
-// 5) Once all lines are drawn, we fire a VBLANK and return to line 0, delaying a certain amount
-//   of lines as we do so
-
-// Going to need to write logic for handling tile and sprite reads, palette conversion,
-// background and foreground drawing, all of that fun stuff.
-// All the info we need will be on NESDEV!
-
-// (In our case, we do all of this work on an SDL texture bytewise, and on the VBLANK,
-// we tell SDL to display the new texture since it's finished drawing)
-
-// https://www.nesdev.org/wiki/PPU_rendering
-
 void NESDL_PPU::Init(NESDL_Core* c)
 {
     elapsedCycles = 0;
@@ -43,18 +24,11 @@ void NESDL_PPU::Update(uint32_t ppuCycles)
     }
 }
 
-uint64_t NESDL_PPU::MillisecondsToPPUCycles(double ms)
-{
-    return (NESDL_PPU_CLOCK / 1000) * ms;
-}
-
 bool NESDL_PPU::IsPPUReady()
 {
-    return elapsedCycles >= NESDL_PPU_CYCLE_READY * 3;
+    return elapsedCycles >= NESDL_PPU_READY * 3;
 }
 
-// TODO misnomer - we're not running clock cycles one-at-a-time exactly, but
-// we're not processing "instructions" like the CPU either. Need a better name!
 void NESDL_PPU::RunNextCycle()
 {
     // Each PPU cycle is one pixel being rendered. There are 341 cycles per scanline,
@@ -70,9 +44,10 @@ void NESDL_PPU::RunNextCycle()
     }
     
     elapsedCycles++;
+    currentScanlineCycle = elapsedCycles % 341;
     
     // Wrap counters around
-    if (elapsedCycles % 341 == 0)
+    if (currentScanlineCycle == 0)
     {
         currentScanline++;
     }
@@ -81,31 +56,12 @@ void NESDL_PPU::RunNextCycle()
         currentScanline = 0;
         currentFrame++;
     }
-    
-    posInScanline = elapsedCycles % 341;
-}
-
-void memset32(void* dest, uint32_t value, uintptr_t size)
-{
-    uintptr_t i;
-    for(i = 0; i < (size & (~3)); i += 4)
-    {
-        memcpy(((char*)dest) + i, &value, 4);
-    }
 }
 
 void NESDL_PPU::HandleProcessVisibleScanline()
 {
-    uint16_t currentScanlineCycle = elapsedCycles % 341; // TODO un-magic this number
-    
     if (currentScanline == 0 && currentScanlineCycle == 0)
     {
-        
-        // Set background color to palette color at 0x3F00
-//        uint32_t p = GetPalette(0,false);
-//        uint32_t c = GetColor(0,p,0);
-//        memset32(frameData, c, sizeof(frameData));
-        
         // Clear frameDataSprite table for next frame
         memset(frameDataSprite, 0x3F, sizeof(frameDataSprite));
         
@@ -116,6 +72,7 @@ void NESDL_PPU::HandleProcessVisibleScanline()
             if (currentFrame % 2 == 0)
             {
                 elapsedCycles++;
+                currentScanlineCycle = elapsedCycles % 341;
             }
         }
     }
@@ -126,16 +83,6 @@ void NESDL_PPU::HandleProcessVisibleScanline()
         // Every 8 pixels (skipping px 0) we repeat the same process for tiles
         uint8_t pixelInFetchCycle = currentScanlineCycle % 8;
         
-//        if (currentScanlineCycle == 0 && (registers.mask & PPUMASK_SPRENABLE) != 0x00)
-//        {
-//            // THE ONLY TIME we advance the cycle count artificially - this cycle is skipped
-//            // when the frame count is odd (counting by 0)
-//            if (currentFrame % 2 == 0)
-//            {
-//                elapsedCycles++;
-//            }
-//        }
-//        else if (currentScanlineCycle < 256)
         if (currentScanlineCycle > 0 && currentScanlineCycle < 256)
         {
             FetchAndStoreTile(pixelInFetchCycle); // Runs across multiple cycles in order to achieve this
@@ -146,7 +93,6 @@ void NESDL_PPU::HandleProcessVisibleScanline()
                 // Grab the tile to be rendered (from tileBuffer) and render it, advancing our
                 // currentDrawX index
                 PPUTileFetch toRender = tileFetch;
-                //            PPUTileFetch toRender = tileBuffer[1];
                 
                 uint8_t start = 0;
                 uint8_t end = 8;
@@ -155,11 +101,6 @@ void NESDL_PPU::HandleProcessVisibleScanline()
                 if (tileIndex == 0)
                 {
                     start = (registers.x & 0x7);
-                }
-                if (tileIndex == 31)
-                {
-//                    end = 0;
-//                    end = 8 - (registers.x & 0x7);
                 }
                 
                 for (int i = start; i < end; ++i)
@@ -180,8 +121,6 @@ void NESDL_PPU::HandleProcessVisibleScanline()
                     }
                     currentDrawX++;
                 }
-//                tileBuffer[1] = tileBuffer[0];
-//                tileBuffer[0] = tileFetch;
                 
                 // Coarse X increment (wraps horizontal scroll, technically runs 1 cycle sooner?)
                 // https://www.nesdev.org/wiki/PPU_scrolling#Wrapping_around
@@ -256,26 +195,26 @@ void NESDL_PPU::HandleProcessVisibleScanline()
             // Reset horizontal scroll
             registers.v = (registers.v & 0xFBE0) | (registers.t & 0x41F);
             currentDrawX = 0;
-//            currentDrawX = 7 - (registers.x & 0x7);
         }
         else if (currentScanlineCycle < 321)
         {
-            // TODO "tile data for the sprites on the next scanline are fetched here"
+            // "Tile data for the sprites on the next scanline are fetched here"
         }
         else if (currentScanlineCycle < 337)
         {
-            FetchAndStoreTile(pixelInFetchCycle); // Run tile fetch for the next two tiles (takes exactly 16 cycles which is what we want)
-            
-            if (pixelInFetchCycle == 7)
-            {
-                //            tileBuffer[1] = tileBuffer[0];
-                //            tileBuffer[0] = tileFetch;
-            }
+            // "Run tile fetch for the next two tiles"
+            // But with the way things are set up, this is not needed
         }
         else if (currentScanlineCycle < 341)
         {
             // Two NT bytes are fetched but is really not necessary (except for maper MMC5, we can write a special case in for that)
         }
+    }
+    else
+    {
+        // BG rendering is disabled = we should be rendering backdrop instead
+        uint16_t currentPixel = (currentScanline * PPU_WIDTH) + currentScanlineCycle;
+        frameData[currentPixel] = NESDL_PALETTE[paletteData[0]];
     }
     
     // SPRITE LOGIC - don't run if sprite rendering is disabled (or we're on line 0, we don't run)
@@ -288,20 +227,19 @@ void NESDL_PPU::HandleProcessVisibleScanline()
             {
                 PPUSprFetch sprData = sprDataToDraw[i];
                 
-                // Don't bother if we're not rendering this one
+                // Exit early - we're not rendering (yet)
                 if (currentScanlineCycle < sprData.startX || currentScanlineCycle >= sprData.startX + 8)
                 {
                     continue;
                 }
                 
-                // Rather than doing all 8 pixels, we render sprites per-pixel across the scanline (for sprite 0 hit accuracy)
                 uint16_t currentPixel = (currentScanline * PPU_WIDTH) + currentScanlineCycle;
                 uint8_t index = (currentScanlineCycle - sprData.startX) % 8;
                 
-                // We're going out of bounds on screen - return early
+                // We're going out of bounds on screen - don't continue rendering
                 if (currentPixel >= (PPU_WIDTH * PPU_HEIGHT))
                 {
-                    break;
+                    continue;
                 }
 
                 // We only go further IFF the pixel to render isn't the backdrop index!
@@ -315,43 +253,35 @@ void NESDL_PPU::HandleProcessVisibleScanline()
                     
                     // We only keep going if this sprite has a lower OAM index than any written before it here
                     // (AKA this sprite has priority)
-//                    uint8_t d = frameDataSprite[currentPixel] & 0x3F;
-//                    if (d <= sprData.oamIndex)
-//                    {
-//                        continue;
-//                    }
+                    uint8_t pixelOAM = frameDataSprite[currentPixel] & 0x3F;
+                    if (sprData.oamIndex >= pixelOAM)
+                    {
+                        continue;
+                    }
                     
-                    // This sprite pixel is significant - mark the OAM index, regardless of if we've written to it or not yet or BG tile priorty (lends itself to a notable "sprite priority quirk" with this implementation)
+                    // This sprite pixel is significant - mark the OAM index, regardless of if we've written to it or not yet or BG tile priority (used for the "sprite priority quirk")
                     frameDataSprite[currentPixel] = (frameDataSprite[currentPixel] & 0xC0) | (sprData.oamIndex & 0x3F);
                     
                     if (sprData.bgPriority)
                     {
+                        // TODO we DO need a better way to do this - bgPriority sprites are currently
+                        // being rendered very oddly, it's working but flickering every other frame
+                        
                         // We may discard this pixel if the tile takes priority
                         if (frameData[currentPixel] != NESDL_PALETTE[paletteData[0]])
                         {
                             continue;
                         }
-                        // TODO do we need a better way to detect this? Some tiles may use the same color
-                        // as 0x3F00, but not be transparent. Curious how the NES does this w/o
-                        // multiple screen buffers?
-                    }
-                    else
-                    {
-                        
                     }
                     
-                    // Write a bit signifying that we wrote a SPR pixel here!
+                    // We finally get to draw the pixel!
+                    
+                    // Write a bit signifying that we wrote a SPR pixel here
                     frameDataSprite[currentPixel] = 0x40 | (sprData.oamIndex & 0x3F);
                     
                     uint32_t palette = GetPalette(sprData.paletteIndex, true);
                     uint32_t color = GetColor(sprData.pattern, palette, index);
-                    
                     frameData[currentPixel] = color;
-                }
-                else
-                {
-                    // Mark that we didn't write a pixel here
-//                    frameDataSprite[currentPixel] = 0;
                 }
             }
         }
@@ -453,7 +383,6 @@ void NESDL_PPU::HandleProcessVisibleScanline()
                     bool sprIs8By16 = (registers.ctrl & PPUCTRL_SPRHEIGHT) != 0x00;
                     
                     // Find out where we'll be starting to render on this line
-//                    uint16_t sprStartX = (currentScanline * PPU_WIDTH) + sprX;
                     uint16_t sprRow = (currentScanline - sprY) % (sprIs8By16 ? 16 : 8);
                     
                     // Flip tile read if the sprite's vertical flip bit is set
@@ -487,52 +416,12 @@ void NESDL_PPU::HandleProcessVisibleScanline()
                     uint8_t ptrnHi = ReadFromVRAM(patternAddr + 8);
                     uint16_t sprPattern = WeavePatternBits(ptrnLow, ptrnHi, sprFlipHorizontal);
                     
-//                    printf("\n%d\t%d", sprFetchIndex, sprOAMIndex);
-//                    sprDataToDraw[sprDataToDrawCount].oamIndex = sprFetchIndex;
                     sprDataToDraw[sprDataToDrawCount].oamIndex = sprOAMIndex;
                     sprDataToDraw[sprDataToDrawCount].pattern = sprPattern;
                     sprDataToDraw[sprDataToDrawCount].startX = sprX;
                     sprDataToDraw[sprDataToDrawCount].paletteIndex = sprPaletteIndex;
                     sprDataToDraw[sprDataToDrawCount].bgPriority = sprTilePriority;
                     sprDataToDrawCount++;
-                    
-                    // Go through all 8 pixels for this sprite and draw them according to the sprite's attributes
-//                    for (uint8_t i = 0; i < 8; ++i)
-//                    {
-//                        uint8_t index = sprFlipHorizontal ? (7-i) : i;
-//                        
-//                        // Get pixel position on the scanline + loop X offset
-//                        uint16_t currentPixel = sprStartX + index;
-//                        
-//                        // We're going out of bounds on screen - return early
-//                        if (currentPixel >= (PPU_WIDTH * PPU_HEIGHT))
-//                        {
-//                            break;
-//                        }
-//                        
-//                        uint32_t palette = GetPalette(sprPaletteIndex, true);
-//                        uint32_t color = GetColor(sprPattern, palette, index);
-//                        
-//                        if (sprTilePriority)
-//                        {
-//                            // We may discard this pixel if the tile takes priority
-//                            if (frameData[currentPixel] != NESDL_PALETTE[paletteData[0]])
-//                            {
-//                                continue;
-//                            }
-//                            // TODO need a better way to detect this? Some tiles may use the same color
-//                            // as 0x3F00 but not be transparent. Curious how the NES does this w/o
-//                            // multiple screen buffers
-//                        }
-//                        // If this is sprite zero, we haven't hit sprite 0 this frame yet, and we have a non-BG pixel to render, then mark that we rendered it at least one pixel!
-//                        if (!didSpr0Hit && hasSpr0 && sprFetchIndex == 0 && GetPatternBits(sprPattern, index) != 0x0)
-//                        {
-//                            registers.status |= PPUSTATUS_SPR0HIT;
-//                            didSpr0Hit = true;
-//                        }
-//                        
-//                        frameData[currentPixel] = color;
-//                    }
                     
                     // Advance sprite fetch index since we successfully drew this one
                     sprFetchIndex++;
@@ -545,23 +434,7 @@ void NESDL_PPU::HandleProcessVisibleScanline()
 
 void NESDL_PPU::FetchAndStoreTile(uint8_t pixelInFetchCycle)
 {
-//    uint16_t currentScanlineCycle = elapsedCycles % 341; // TODO un-magic this number
-    // Every 8 pixels (skipping px 0) we repeat the same process for tiles
-//    uint8_t pixelInFetchCycle = currentScanlineCycle % 8;
-    
-    /*
-     FROM: https://www.nesdev.org/wiki/PPU_programmer_reference#Internal_registers
-     
-     Conceptually, the PPU does this 33 times for each scanline:
-
-         Fetch a nametable entry from $2000-$2FFF.
-         Fetch the corresponding attribute table entry from $23C0-$2FFF and increment the current VRAM address within the same row.
-         Fetch the low-order byte of an 8x1 pixel sliver of pattern table from $0000-$0FF7 or $1000-$1FF7.
-         Fetch the high-order byte of this sliver from an address 8 bytes higher.
-         Turn the attribute data and the pattern table data into palette indices, and combine them with data from sprite data using priority.
-
-     It also does a fetch of a 34th (nametable, attribute, pattern) tuple that is never used, but some mappers rely on this fetch for timing purposes.
-     */
+    // Every 8 pixels (skipping cycle 0 I believe) we repeat the same process for tiles
     
     if (pixelInFetchCycle == 1)  // Cycle 1-2 - Fetch nametable
     {
@@ -597,10 +470,6 @@ void NESDL_PPU::FetchAndStoreTile(uint8_t pixelInFetchCycle)
         // Start with which pattern bank to read from
         uint16_t patternAddr = ((registers.ctrl & PPUCTRL_BGTILE) >> 4) * 0x100;
         uint8_t rowIndex = currentScanline % 8;
-//        if (currentScanline < 48)
-//        {
-//            printf("ADDR: %#06x\tSCANLINE: %d\tINDEX: %d\tNT: %d\n", registers.v, currentScanline, rowIndex, tileFetch.nametable);
-//        }
         patternAddr = ((patternAddr + tileFetch.nametable) << 4) + rowIndex;
         
         uint8_t ptrnLow = ReadFromVRAM(patternAddr);
@@ -611,14 +480,12 @@ void NESDL_PPU::FetchAndStoreTile(uint8_t pixelInFetchCycle)
     }
     if (pixelInFetchCycle == 7) // Cycle 7-8 - Fetch pattern table high bytes (finishes on next cycle 0)
     {
-        // Since we performed both pattern table fetches together already, there's nothing to do here.
-        // tileFetch has been fully constructed
+        // tileFetch has been fully constructed - no need to do anything here
     }
 }
 
 void NESDL_PPU::HandleProcessVBlankScanline()
 {
-    uint16_t currentScanlineCycle = elapsedCycles % 341; // TODO un-magic this number
     // Every 8 pixels (skipping px 0) we repeat the same process for tiles
     uint8_t pixelInFetchCycle = currentScanlineCycle % 8;
     
@@ -637,17 +504,6 @@ void NESDL_PPU::HandleProcessVBlankScanline()
                 core->cpu->nmi = true;
             }
             disregardVBL = false;
-        }
-        if (currentScanlineCycle == 7)
-        {
-            // Ideally NMI fires at VBL+9 (since it begins vectoring around VBL+2 or 4?)
-            // Since we're an emulator and can run this all instantaneously*, we wait to
-            // fire NMI until it's officially ready on hardware to do so
-//            if ((registers.ctrl & PPUCTRL_NMIENABLE) != 0x00)
-//            {
-//                // Also triggers an NMI (VBlank NMI)
-//                core->cpu->nmi = true;
-//            }
         }
     }
     else if (currentScanline == 261)
@@ -670,53 +526,9 @@ void NESDL_PPU::HandleProcessVBlankScanline()
             }
             
             FetchAndStoreTile(pixelInFetchCycle); // Runs across multiple cycles in order to achieve this
-            
-            // On the last cycle, render the tile sitting in the shift register and store the loaded tile data in
-            if (pixelInFetchCycle == 7) // Cycle 7-8 - Fetch pattern table high bytes (finishes on next cycle 0)
-            {
-                // Grab the tile to be rendered but don't render (dummy scanline)
-//                tileBuffer[1] = tileBuffer[0];
-//                tileBuffer[0] = tileFetch;
-                
-                // Coarse X increment (wraps horizontal scroll, technically runs 1 cycle sooner?)
-                // https://www.nesdev.org/wiki/PPU_scrolling#Wrapping_around
-//                if ((registers.v & 0x001F) == 31)   // if coarse X == 31
-//                {
-//                    registers.v &= ~0x001F;         // coarse X = 0
-//                    registers.v ^= 0x0400;          // switch horizontal nametable
-//                }
-//                else
-//                {
-//                    registers.v += 1;               // increment coarse X
-//                }
-            }
         }
         else if (currentScanlineCycle == 256)
         {
-            // Coarse Y increment
-//            if ((registers.v & 0x7000) != 0x7000)       // if fine Y < 7
-//            {
-//                registers.v += 0x1000;                  // increment fine Y
-//            }
-//            else
-//            {
-//                registers.v &= ~0x7000;                 // fine Y = 0
-//                int y = (registers.v & 0x03E0) >> 5;    // let y = coarse Y
-//                if (y == 29)
-//                {
-//                    y = 0;                              // coarse Y = 0
-//                    registers.v ^= 0x0800;              // switch vertical nametable
-//                }
-//                else if (y == 31)
-//                {
-//                    y = 0;                              // coarse Y = 0, nametable not switched
-//                }
-//                else
-//                {
-//                    y += 1;                             // increment coarse Y
-//                }
-//                registers.v = (registers.v & ~0x03E0) | (y << 5); // put coarse Y back into v
-//            }
         }
         else if (currentScanlineCycle == 257)
         {
@@ -731,7 +543,8 @@ void NESDL_PPU::HandleProcessVBlankScanline()
         {
             if (isRenderingEnabled)
             {
-                // TODO "tile data for the sprites on the next scanline are fetched here"
+                // "tile data for the sprites on the next scanline are fetched here"
+                // (we don't need to do this, as far as I'm aware)
                 
                 // Special case for pre-render scanline: reset vertical scroll (repeatedly)
                 if (currentScanlineCycle >= 280 && currentScanlineCycle <= 304)
@@ -742,20 +555,6 @@ void NESDL_PPU::HandleProcessVBlankScanline()
         }
         else if (currentScanlineCycle < 337)
         {
-            // Don't run logic if BG rendering is disabled
-            if ((registers.mask & PPUMASK_BGENABLE) == 0x00)
-            {
-                return;
-            }
-            
-//            FetchAndStoreTile(); // Run tile fetch for the next two tiles (takes exactly 16 cycles which is what we want)
-            
-            if (pixelInFetchCycle == 7)
-            {
-//                tileBuffer[1] = tileBuffer[0];
-//                tileBuffer[0] = tileFetch;
-//                registers.v += 1;               // increment coarse X
-            }
         }
         else if (currentScanlineCycle < 341)
         {
@@ -766,31 +565,14 @@ void NESDL_PPU::HandleProcessVBlankScanline()
 
 void NESDL_PPU::PreprocessPPUForReadInstructionTiming(uint8_t instructionPPUTime)
 {
-    uint32_t cyclesThisFrame = (currentScanline * 341) + posInScanline;
+    uint32_t cyclesThisFrame = (currentScanline * 341) + currentScanlineCycle;
     uint32_t cyclesAfterInstruction = cyclesThisFrame + instructionPPUTime;
     uint32_t setTarget = ((241 * 341) + 1);
     uint32_t clearTarget = ((261 * 341) + 1);
     
-    // If we're before PPU cycle (241,1) and the next CPU instruction occurs when we pass over this cycle,
-    // just set the VBL flag right away
-//    if (cyclesThisFrame < target && cyclesThisFrame + instructionPPUTime >= target)
-//    {
-//        // Race condition - "Reading PPUSTATUS within two cycles of the start of VBL will return 0" (ouch)
-//        if (cyclesThisFrame < (target-1))
-//        {
-//            registers.status |= PPUSTATUS_VBLANK;
-//            if ((registers.ctrl & PPUCTRL_NMIENABLE) != 0x00)
-//            {
-//                // Also triggers an NMI (VBlank NMI)
-//                core->cpu->nmi = true;
-//            }
-//            vblAlreadyHappened = true;
-//        }
-//        else
-//        {
-//            disregardVBL = true;
-//        }
-//    }
+    // This VBL preprocessor is mainly to handle the case where we LDA 0x2002 at the end of scanline 240,
+    // when the timing is most crucial (VBL AND NMI), as well as clearing on scanline 261.
+    
     if (!disregardVBL)
     {
         // Extra-specific timing thing - if we're reading ON (241,1), the PPU hasn't run a step yet. So let's just... VBL
@@ -800,7 +582,7 @@ void NESDL_PPU::PreprocessPPUForReadInstructionTiming(uint8_t instructionPPUTime
         }
         if (cyclesThisFrame < setTarget && cyclesAfterInstruction >= (setTarget-1))
         {
-            // Some weird VBL race conditions:
+            // Some weird VBL race conditions (thank you NESDEV):
             
             // 1) Reading target-1 results in no VBL, no NMI
             if (cyclesAfterInstruction == setTarget-1)
@@ -855,7 +637,6 @@ void NESDL_PPU::WriteToRegister(uint16_t registerAddr, uint8_t data)
             registers.ctrl = data;
             // Write nametable bits to register t
             registers.t = (registers.t & 0xF3FF) | ((uint16_t(data) & 0x3) << 10);
-            
             break;
         case PPU_PPUMASK:
             registers.mask = data;
@@ -922,8 +703,7 @@ void NESDL_PPU::WriteToRegister(uint16_t registerAddr, uint8_t data)
             // DMA write is a very involved process - the CPU is halted while RAM is transferred to OAM.
             // Since we're an emulator and the STA/X instruction is still running, if we alter
             // the CPU's elapsed cycle count now it will effectively halt the very next instruction
-//            core->cpu->HaltCPUForDMAWrite();
-            core->cpu->dmaDelayNextFrame = true;
+            core->cpu->dma = true;
             // Transfer data from 0x##00 - 0x##FF
             uint16_t targetAddr = data << 8;
             for (int i = 0; i < 256; ++i)
@@ -977,7 +757,7 @@ uint8_t NESDL_PPU::ReadFromRegister(uint16_t registerAddr)
             // Undefined behavior to read from OAMADDR -- do nothing
             break;
         case PPU_OAMDATA:
-            // Some models don't have read functionality. We can assume developers knew this at the time, and don't bother implementing this (right?)
+            // Some models don't have read functionality. We can assume developers knew this at the time, and don't bother truly implementing this (famous last words)
             return 0xFF;
         case PPU_PPUSCROLL:
             // Undefined behavior to read from PPUSCROLL -- do nothing
@@ -1002,7 +782,6 @@ uint8_t NESDL_PPU::ReadFromRegister(uint16_t registerAddr)
                     {
                         uint8_t vramData = ppuDataReadBuffer;
                         ppuDataReadBuffer = ReadFromVRAM(registers.v);
-                        // TODO support palette RAM reading rules ( it's complicated, see: https://www.nesdev.org/wiki/PPU_registers#Reading_palette_RAM )
                         // Increment v by the amount specified from PPUCTRL bit 2
                         if (incrementV)
                         {
@@ -1024,7 +803,7 @@ uint8_t NESDL_PPU::ReadFromRegister(uint16_t registerAddr)
 uint8_t NESDL_PPU::ReadFromVRAM(uint16_t addr)
 {
     // Depending on mirroring, we return values different
-    // TODO assuming horizontal mirroring for now!
+    // TODO assuming vertical mirroring for now!
     
     // Accessing CHR ROM/RAM data from cartridge
     if (addr < 0x2000)
@@ -1077,7 +856,7 @@ void NESDL_PPU::WriteToVRAM(uint16_t addr, uint8_t data)
     
     if (addr >= 0x2000 && addr < 0x3000)
     {
-        // TODO nametable mirroring! Assuming horizontal
+        // TODO nametable mirroring! Assuming vertical
         if (addr >= 0x2800)
         {
             addr = 0x2000 | (addr % 0x800);
@@ -1144,33 +923,8 @@ uint32_t NESDL_PPU::GetColor(uint16_t pattern, uint32_t palette, uint8_t pixelIn
     }
     // Get color from palette index!
     uint32_t resultColor = NESDL_PALETTE[paletteIndex];
-//    if ((registers.mask & (PPUMASK_TINT_R | PPUMASK_TINT_G | PPUMASK_TINT_B)) != 0x00)
-//    {
-//        // Tint result colors if needed
-//        uint8_t r = (resultColor & 0xFF0000) >> 16;
-//        uint8_t g = (resultColor & 0x00FF00) >> 8;
-//        uint8_t b = (resultColor & 0x0000FF);
-//        if ((registers.mask & PPUMASK_TINT_R) != 0x00)
-//        {
-//            r /= 0.816328;
-//            g *= 0.816328;
-//            b *= 0.816328;
-//        }
-//        if ((registers.mask & PPUMASK_TINT_G) != 0x00)
-//        {
-//            r *= 0.816328;
-//            g /= 0.816328;
-//            b *= 0.816328;
-//        }
-//        if ((registers.mask & PPUMASK_TINT_B) != 0x00)
-//        {
-//            r *= 0.816328;
-//            g *= 0.816328;
-//            b /= 0.816328;
-//        }
-//        resultColor = MakeColor(r, g, b);
-//    }
-    
+    // TODO implement tinting via PPUMASK. I'm not keen on perfectly recreating
+    // tinting via accurate video signal manipulation, a fast approx will do
     
     return resultColor;
 }

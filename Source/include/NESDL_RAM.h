@@ -10,7 +10,6 @@ public:
 	void WriteByte(uint16_t addr, uint8_t data);
 	void WriteBytes(uint16_t addr, uint8_t* data, size_t size);
 	void WriteROMData(uint8_t* data, uint8_t bankCount);
-	void WriteVROMData(uint8_t* data, uint8_t bankCount);
     bool oops;
     bool ignoreChanges;
 private:

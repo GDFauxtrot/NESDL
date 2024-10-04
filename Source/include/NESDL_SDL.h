@@ -9,7 +9,6 @@ public:
 private:
 	SDL_Window* window;
 	SDL_Renderer* renderer;
-	SDL_Texture* texture1;
-    SDL_Texture* texture2;
+    SDL_Texture* texture;
     bool render1;
 };

@@ -10,9 +10,7 @@ void NESDL_CPU::Init(NESDL_Core* c)
 
 void NESDL_CPU::Start()
 {
-    // CPU warms up for 7 cycles and fetches the true start address
-    // from 0xFFFC. Let's do the same here
-
+    // CPU warms up for 7 cycles and fetches the start address to PC
     InitializeCPURegisters();
     registers.pc = core->ram->ReadWord(registers.pc);
     elapsedCycles += 7;
@@ -20,35 +18,8 @@ void NESDL_CPU::Start()
 
 void NESDL_CPU::Update(uint32_t ppuCycles)
 {
-    // Get the next instruction to be run and wait that many cycles to complete it.
-    // We want to execute the instruction fully AFTER the alotted time for that instruction
-    // in order to leave room for the PPU to execute what it needs to properly
-    // (If we wanted perfect accurate emulation, we'd simulate waits on opcode reads and various
-    // actions on the hardware, but this method also seems to work well enough)
-    
-    // PPU cycle counter has set amount of cycles (normally 1) added to it every update.
-    // If the count >= 3, we're due for at least one CPU cycle update
-    
-    // Find out how long the next instruction will take.
-    // We delay execution until we've counted up to that value, reset the counter
-    // then run the instruction and evaluate the next instruction's time.
     uint8_t nextInstructionPPUTime = GetCyclesForNextInstruction() * 3;
-//    ppuCycleCounter += ppuCycles;
-//    while (ppuCycleCounter > nextInstructionPPUTime)
-//    {
-//        // Handle NMI
-//        if (nmi)
-//        {
-//            nmi = false;
-//            NMI();
-//        }
-//        else
-//        {
-//            ppuCycleCounter -= nextInstructionPPUTime;
-//            RunNextInstruction();
-//            nextInstructionPPUTime = GetCyclesForNextInstruction() * 3;
-//        }
-//    }
+    
     while (ppuCycleCounter >= 0)
     {
         // Handle NMI
@@ -57,17 +28,17 @@ void NESDL_CPU::Update(uint32_t ppuCycles)
             nmi = false;
             NMI();
         }
-        else if (dmaDelay)
+        else if (delayedDMA)
         {
-            dmaDelay = false;
+            delayedDMA = false;
             HaltCPUForDMAWrite();
         }
         else
         {
-            if (dmaDelayNextFrame)
+            if (dma)
             {
-                dmaDelayNextFrame = false;
-                dmaDelay = true;
+                dma = false;
+                delayedDMA = true;
             }
             delayNMI = false;
             
@@ -83,33 +54,16 @@ void NESDL_CPU::Update(uint32_t ppuCycles)
                 }
             }
             
-//            if (elapsedCycles >= 956399)
-//            {
-//                // Debug Nintendulator format
-//                printf("\n%04X\t\t\t\t\t\t\t\t\t\t\tA:%02X X:%02X Y:%02X P:%02X SP:%02X PPU:%3d,%3d CYC:%llu", registers.pc, registers.a, registers.x, registers.y, registers.p, registers.sp, core->ppu->posInScanline, core->ppu->currentScanline, elapsedCycles);
-//            }
+            {
+                // Debug Nintendulator format
+//                printf("\n%04X\t\t\t\t\t\t\t\t\t\t\tA:%02X X:%02X Y:%02X P:%02X SP:%02X PPU:%3d,%3d CYC:%llu", registers.pc, registers.a, registers.x, registers.y, registers.p, registers.sp, core->ppu->currentScanlineCycle, core->ppu->currentScanline, elapsedCycles);
+            }
             
             ppuCycleCounter -= nextInstructionPPUTime;
             RunNextInstruction();
-//            nextInstructionPPUTime = GetCyclesForNextInstruction() * 3;
         }
     }
     ppuCycleCounter += ppuCycles;
-    
-//    if (ppuCycleCounter == 0)
-//    {
-////        printf("\n%04X\t\t\t\t\t\t\t\t\t\t\tA:%02X X:%02X Y:%02X P:%02X SP:%02X PPU:%3d,%3d CYC:%llu", registers.pc, registers.a, registers.x, registers.y, registers.p, registers.sp, core->ppu->posInScanline, core->ppu->currentScanline, elapsedCycles);
-//        nextInstruction = GetNextInstructionByte();
-//        nextInstructionSet = true;
-//    }
-//    
-//    if (nextInstructionSet && ppuCycleCounter >= 5)
-//    {
-//        nextInstructionSet = false;
-//        ppuCycleCounter -= GetCyclesForNextInstruction() * 3;
-//        RunNextInstruction();
-//    }
-//    ppuCycleCounter += ppuCycles;
 }
 
 void NESDL_CPU::InitializeCPURegisters()
@@ -129,6 +83,9 @@ uint8_t NESDL_CPU::GetCyclesForNextInstruction()
     // Run next instruction to see how long it'll take, then reset the CPU state
     CPURegisters regState = registers;
     uint64_t prevElapsedCycles = elapsedCycles;
+    // TODO
+    // Well... a better solution to this would be nice. It helps to simulate the
+    // next instruction to figure out timing, but WOW what a mess this is.
     core->ppu->ignoreChanges = true;
     core->ram->ignoreChanges = true;
     core->input->ignoreChanges = true;
@@ -142,16 +99,10 @@ uint8_t NESDL_CPU::GetCyclesForNextInstruction()
     return result;
 }
 
-uint8_t NESDL_CPU::GetNextInstructionByte()
-{
-    return core->ram->ReadByte(registers.pc++);
-}
-
 void NESDL_CPU::RunNextInstruction()
 {
 	// Get next instruction from memory according to current program counter
 	uint8_t opcode = core->ram->ReadByte(registers.pc++);
-//    uint8_t opcode = nextInstruction;
     
     switch (opcode)
     {
@@ -647,7 +598,7 @@ template <typename T> int8_t sign(T val) {
 }
 
 
-void NESDL_CPU::SetPSFlag(PStatusFlag flag, bool on)
+void NESDL_CPU::SetPSFlag(uint8_t flag, bool on)
 {
     if (on)
     {
@@ -711,6 +662,7 @@ void NESDL_CPU::GetByteForAddressMode(AddrMode mode, AddressModeResult* result)
         case AddrMode::ABSOLUTEX:
         {
             uint16_t addr = core->ram->ReadWord(registers.pc);
+            // Trigger an "oops" if this mode crossed page bounds
             core->ram->oops = (addr / 0x100) != ((addr + registers.x) / 0x100);
             addr += registers.x;
             result->value = core->ram->ReadByte(addr);
@@ -721,6 +673,7 @@ void NESDL_CPU::GetByteForAddressMode(AddrMode mode, AddressModeResult* result)
         case AddrMode::ABSOLUTEY:
         {
             uint16_t addr = core->ram->ReadWord(registers.pc);
+            // Trigger an "oops" if this mode crossed page bounds
             core->ram->oops = (addr / 0x100) != ((addr + registers.y) / 0x100);
             addr += registers.y;
             result->value = core->ram->ReadByte(addr);
@@ -753,22 +706,15 @@ void NESDL_CPU::GetByteForAddressMode(AddrMode mode, AddressModeResult* result)
     }
 }
 
-// Advances the CPU cycle count for most address modes with a consistent cycle count
-// (With the exception of IMPLICIT as it's specific per-opcode)
 void NESDL_CPU::AdvanceCyclesForAddressMode(uint8_t opcode, AddrMode mode, bool pageCross, bool extraCycles, bool relSuccess)
-{
-    elapsedCycles += GetCyclesForAddressMode(opcode, mode, pageCross, extraCycles, relSuccess);
-}
-
-uint8_t NESDL_CPU::GetCyclesForAddressMode(uint8_t opcode, AddrMode mode, bool pageCross, bool extraCycles, bool relSuccess)
 {
     if (opcode == 0x4C)
     {
-        return 3;
+        elapsedCycles += 3;
     }
     if (opcode == 0x6C)
     {
-        return 5;
+        elapsedCycles += 5;
     }
     switch (mode)
     {
@@ -778,50 +724,50 @@ uint8_t NESDL_CPU::GetCyclesForAddressMode(uint8_t opcode, AddrMode mode, bool p
             {
                 case 0x08:
                 case 0x48:
-                    return 3;
+                    elapsedCycles += 3;
                     break;
                 case 0x28:
                 case 0x68:
-                    return 4;
+                    elapsedCycles += 4;
                     break;
                 case 0x40:
                 case 0x60:
-                    return 6;
+                    elapsedCycles += 6;
                     break;
                 case 0x00:
-                    return 7;
+                    elapsedCycles += 7;
                     break;
             }
-            return 2;
+            elapsedCycles += 2;
             break;
         case ZEROPAGE:
-            return 3 + (extraCycles ? 2 : 0);
+            elapsedCycles += 3 + (extraCycles ? 2 : 0);
             break;
         case ZEROPAGEX:
         case ZEROPAGEY:
-            return 4 + (extraCycles ? 2 : 0);
+            elapsedCycles += 4 + (extraCycles ? 2 : 0);
             break;
         case ABSOLUTE:
-            return 4 + (extraCycles ? 2 : 0); // One exception being JMP (3/5 cycles)
+            elapsedCycles += 4 + (extraCycles ? 2 : 0); // One exception being JMP (3/5 cycles)
             break;
         case ABSOLUTEX:
-            return 4 + (extraCycles ? 3 : pageCross);
+            elapsedCycles += 4 + (extraCycles ? 3 : pageCross);
             break;
         case ABSOLUTEY:
-            return 4 + pageCross;
+            elapsedCycles += 4 + pageCross;
             break;
         case RELATIVE:
-            return 2 + pageCross + relSuccess;
+            elapsedCycles += 2 + pageCross + relSuccess;
             break;
         case ACCUMULATOR:
         case IMMEDIATE:
-            return 2;
+            elapsedCycles += 2;
             break;
         case INDIRECTX:
-            return 6;
+            elapsedCycles += 6;
             break;
         case INDIRECTY:
-            return 5 + pageCross;
+            elapsedCycles += 5 + pageCross;
             break;
     }
 }
@@ -912,7 +858,6 @@ void NESDL_CPU::OP_BCC(uint8_t opcode, AddrMode mode)
         newPage = (oldAddr / 0x100) != (newAddr / 0x100);
     }
     
-//    EvaluateNMIPendingForBranch();
     AdvanceCyclesForAddressMode(opcode, mode, newPage, false, didBranch);
 }
 
@@ -933,7 +878,6 @@ void NESDL_CPU::OP_BCS(uint8_t opcode, AddrMode mode)
         newPage = (oldAddr / 0x100) != (newAddr / 0x100);
     }
     
-//    EvaluateNMIPendingForBranch();
     AdvanceCyclesForAddressMode(opcode, mode, newPage, false, didBranch);
 }
 
@@ -954,7 +898,6 @@ void NESDL_CPU::OP_BEQ(uint8_t opcode, AddrMode mode)
         newPage = (oldAddr / 0x100) != (newAddr / 0x100);
     }
     
-//    EvaluateNMIPendingForBranch();
     AdvanceCyclesForAddressMode(opcode, mode, newPage, false, didBranch);
 }
 
@@ -985,7 +928,6 @@ void NESDL_CPU::OP_BMI(uint8_t opcode, AddrMode mode)
         newPage = (oldAddr / 0x100) != (newAddr / 0x100);
     }
     
-//    EvaluateNMIPendingForBranch();
     AdvanceCyclesForAddressMode(opcode, mode, newPage, false, didBranch);
 }
 
@@ -1006,7 +948,6 @@ void NESDL_CPU::OP_BNE(uint8_t opcode, AddrMode mode)
         newPage = (oldAddr / 0x100) != (newAddr / 0x100);
     }
     
-//    EvaluateNMIPendingForBranch();
     AdvanceCyclesForAddressMode(opcode, mode, newPage, false, didBranch);
 }
 
@@ -1027,7 +968,6 @@ void NESDL_CPU::OP_BPL(uint8_t opcode, AddrMode mode)
         newPage = (oldAddr / 0x100) != (newAddr / 0x100);
     }
     
-//    EvaluateNMIPendingForBranch();
     AdvanceCyclesForAddressMode(opcode, mode, newPage, false, didBranch);
 }
 
@@ -1065,7 +1005,6 @@ void NESDL_CPU::OP_BVC(uint8_t opcode, AddrMode mode)
         newPage = (oldAddr / 0x100) != (newAddr / 0x100);
     }
     
-//    EvaluateNMIPendingForBranch();
     AdvanceCyclesForAddressMode(opcode, mode, newPage, false, didBranch);
 }
 
@@ -1086,36 +1025,30 @@ void NESDL_CPU::OP_BVS(uint8_t opcode, AddrMode mode)
         newPage = (oldAddr / 0x100) != (newAddr / 0x100);
     }
     
-//    EvaluateNMIPendingForBranch();
     AdvanceCyclesForAddressMode(opcode, mode, newPage, false, didBranch);
 }
 
 void NESDL_CPU::OP_CLC(uint8_t opcode, AddrMode mode)
 {
     SetPSFlag(PSTATUS_CARRY, false);
-    
-    // These take two cycles!?
     AdvanceCyclesForAddressMode(opcode, mode, false, false, false);
 }
 
 void NESDL_CPU::OP_CLD(uint8_t opcode, AddrMode mode)
 {
     SetPSFlag(PSTATUS_DECIMAL, false);
-    
     AdvanceCyclesForAddressMode(opcode, mode, false, false, false);
 }
 
 void NESDL_CPU::OP_CLI(uint8_t opcode, AddrMode mode)
 {
     SetPSFlag(PSTATUS_INTERRUPTDISABLE, false);
-    
     AdvanceCyclesForAddressMode(opcode, mode, false, false, false);
 }
 
 void NESDL_CPU::OP_CLV(uint8_t opcode, AddrMode mode)
 {
     SetPSFlag(PSTATUS_OVERFLOW, false);
-    
     AdvanceCyclesForAddressMode(opcode, mode, false, false, false);
 }
 
@@ -1252,9 +1185,10 @@ void NESDL_CPU::OP_JMP(uint8_t opcode, bool indirect)
     registers.pc = addr;
     
     // HACK - in Nintendulator, I've seen an NMI occur AFTER a JMP coinciding at (241,2) on the PPU.
-    // I've been led to assume that the NMI trips on (241,1) and waits for the current instruction to finish,
-    // so I'm not sure why JMP runs first in this very specific instance. But for accuracy I'd like to match this
-    if (core->ppu->posInScanline == 334)
+    // I've been led to assume that the NMI trips on (241,1) and waits for the current instruction
+    // to finish, so I'm not sure why JMP runs first in this very specific instance.
+    // But for accuracy I'd like to match this?
+    if (core->ppu->currentScanlineCycle == 334)
     {
         delayNMI = true;
     }
@@ -1377,8 +1311,6 @@ void NESDL_CPU::OP_PLP(uint8_t opcode, AddrMode mode)
 {
     uint8_t stackVal = core->ram->ReadByte(STACK_PTR + (++registers.sp));
     registers.p = stackVal;
-//    SetPSFlag(PSTATUS_ZERO, stackVal == 0);
-//    SetPSFlag(PSTATUS_NEGATIVE, sign((int8_t)stackVal) < 0);
     
     AdvanceCyclesForAddressMode(opcode, mode, false, false, false);
 }
@@ -1468,50 +1400,23 @@ void NESDL_CPU::OP_SBC(uint8_t opcode, AddrMode mode)
 {
     // SBC is the exact same as ADC except the value for M is bit-flipped
     OP_ADC(opcode, mode, true);
-    
-//    GetByteForAddressMode(mode, addrModeResult);
-//    AdvanceCyclesForAddressMode(opcode, mode, core->ram->oops, false, false);
-//    
-//    // Subtract A, M and (1-C) together to get the result of subtraction with carry
-//    uint8_t oldAcc = registers.a;
-//    uint8_t val = addrModeResult->value;
-//    uint8_t carry = registers.p & PSTATUS_CARRY;
-//    uint8_t result = oldAcc - val - (1-carry); // A-M-(1-C)
-//    registers.a = result;
-//    
-//    // Set the flags as a result of this operation
-//    
-//    // If the result of A+M < A, or (A+M)+C < (A+M), then we have a carry (C)
-//    SetPSFlag(PSTATUS_CARRY, (oldAcc + val) < oldAcc || result < (oldAcc + val) || (oldAcc == val && carry == 1));
-//
-//    // Gonna cheat on this one and just check if the value goes beyond the range of an int8
-//    // (I'm not terribly clever but it is terribly late and I'm terribly tired)
-//    int16_t result16 = (int8_t)oldAcc - (int8_t)val - (1-carry);
-//    SetPSFlag(PSTATUS_OVERFLOW, result16 < -128 || result16 > 127);
-//    
-//    // Set zero and negative flags as usual
-//    SetPSFlag(PSTATUS_ZERO, result == 0);
-//    SetPSFlag(PSTATUS_NEGATIVE, sign((int8_t)result) < 0);
 }
 
 void NESDL_CPU::OP_SEC(uint8_t opcode, AddrMode mode)
 {
     SetPSFlag(PSTATUS_CARRY, true);
-    
     AdvanceCyclesForAddressMode(opcode, mode, false, false, false);
 }
 
 void NESDL_CPU::OP_SED(uint8_t opcode, AddrMode mode)
 {
     SetPSFlag(PSTATUS_DECIMAL, true);
-    
     AdvanceCyclesForAddressMode(opcode, mode, false, false, false);
 }
 
 void NESDL_CPU::OP_SEI(uint8_t opcode, AddrMode mode)
 {
     SetPSFlag(PSTATUS_INTERRUPTDISABLE, true);
-    
     AdvanceCyclesForAddressMode(opcode, mode, false, false, false);
 }
 

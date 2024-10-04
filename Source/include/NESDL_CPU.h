@@ -19,7 +19,6 @@ struct CPURegisters
 #define PSTATUS_UNDEFINED 0x20
 #define PSTATUS_OVERFLOW 0x40
 #define PSTATUS_NEGATIVE 0x80
-typedef uint8_t PStatusFlag;
 
 #define STACK_PTR 0x0100
 
@@ -42,12 +41,10 @@ public:
 	void Update(uint32_t ppuCycles);
     void InitializeCPURegisters();
 	void RunNextInstruction();
-    void SetPSFlag(PStatusFlag flag, bool on);
+    void SetPSFlag(uint8_t flag, bool on);
     void GetByteForAddressMode(AddrMode mode, AddressModeResult* result);
     void AdvanceCyclesForAddressMode(uint8_t opcode, AddrMode mode, bool pageCross, bool extraCycles, bool relSuccess);
-    uint8_t GetCyclesForAddressMode(uint8_t opcode, AddrMode mode, bool pageCross, bool extraCycles, bool relSuccess);
     uint8_t GetCyclesForNextInstruction();
-    uint8_t GetNextInstructionByte();
     void HaltCPUForDMAWrite();
     
     // All opcode declarations
@@ -110,15 +107,13 @@ public:
     void OP_KIL();
     void NMI();
     
-    CPURegisters registers;
     uint64_t elapsedCycles;
+    CPURegisters registers;
     bool nmi;
-    bool delayNMI;
-    bool dmaDelayNextFrame;
-    bool dmaDelay;
+    bool dma;
 private:
-    uint8_t nextInstruction;
-    bool nextInstructionSet;
+    bool delayNMI;
+    bool delayedDMA;
 	NESDL_Core* core;
     AddressModeResult* addrModeResult;
     int16_t ppuCycleCounter;

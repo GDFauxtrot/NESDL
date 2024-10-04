@@ -64,23 +64,12 @@ uint16_t NESDL_RAM::ReadWord(uint16_t addr)
     return result;
 }
 
-//void NESDL_RAM::ReadBytes(uint16_t src, uint16_t dest, size_t size)
-//{
-//	memcpy(ram + dest, ram + src, size);
-//}
-
 void NESDL_RAM::WriteByte(uint16_t addr, uint8_t data)
 {
     if (ignoreChanges)
     {
         return;
     }
-    // Assuming addr is always within VRAM bounds (+ mirrors),
-    // we make sure we're only addressing VRAM
-//    addr = addr % 0x800;
-//    
-//	ram[addr] = data;
-    
     // Filter byte according to target
     
     // 0x0000 - 0x1FFF : 2KB RAM (+ mirroring)
@@ -88,7 +77,7 @@ void NESDL_RAM::WriteByte(uint16_t addr, uint8_t data)
     {
         ram[addr % 0x800] = data;
     }
-    // 0x2000 - 0x3FFF : 8 PPU + OAM registers (+ mirroring)
+    // 0x2000 - 0x3FFF, 0x4014 : 8 PPU + OAM registers (+ mirroring)
     else if (addr < 0x4000 || addr == 0x4014)
     {
         core->ppu->WriteToRegister(addr, data);
@@ -144,11 +133,3 @@ void NESDL_RAM::WriteROMData(uint8_t* addr, uint8_t bankCount)
         WriteBytes(0xC000, addr, bankCount * 0x4000);
     }
 }
-
-void NESDL_RAM::WriteVROMData(uint8_t* addr, uint8_t bankCount)
-{
-    // TODO assume NROM, implement bank switching and all that fun mapper stuff later!
-//    WriteBytes(0x6000, addr, bankCount * 0x2000);
-//    core->ppu->WriteCHRROM(addr);
-}
-

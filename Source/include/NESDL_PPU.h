@@ -89,9 +89,7 @@ class NESDL_PPU
 {
 public:
 	void Init(NESDL_Core* c);
-    void Start();
 	void Update(uint32_t ppuCycles);
-    uint64_t MillisecondsToPPUCycles(double ms);
     bool IsPPUReady();
     void RunNextCycle();
     void HandleProcessVisibleScanline();
@@ -113,18 +111,16 @@ public:
     bool ignoreChanges;
     bool incrementV;
     uint64_t currentFrame;
-    uint16_t posInScanline;
     uint16_t currentScanline;
+    uint16_t currentScanlineCycle;
 private:
     NESDL_Core* core;
     uint64_t elapsedCycles;
     int32_t currentDrawX;
-//    uint16_t currentScanline;
     uint8_t chrData[0x2000]; // 8KB (at a time) of CHR-ROM/RAM memory
     uint8_t vram[0x1000];  // 4kb VRAM for the PPU (physically 2kb on stock but supports 4 nametables)
     uint8_t paletteData[0x20]; // Bit of space at the end of VRAM address space for palette data
     PPUTileFetch tileFetch;
-    PPUTileFetch tileBuffer[2]; // Representation of the tile data sitting in shift registers
     uint8_t ppuDataReadBuffer; // Special internal buffer for PPUDATA reads
     uint8_t oam[64 * 4]; // 64 slots (256 bytes) for PPU "Object Attribute Memory"
     uint8_t secondaryOAM[8 * 5]; // 8 slots (32 + 8 bytes) of next scanline's chosen sprites

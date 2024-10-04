@@ -5,8 +5,8 @@ using namespace std;
 class NESDL_Core; // Decl needed for pointer refs
 
 // Screen dimension constants
-const uint16_t NESDL_SCREEN_WIDTH = 256;
-const uint16_t NESDL_SCREEN_HEIGHT = 240;
+#define NESDL_SCREEN_WIDTH 256
+#define NESDL_SCREEN_HEIGHT 240
 const string NESDL_WINDOW_NAME = "NESDL";
 
 // PPU
@@ -20,14 +20,13 @@ const uint32_t NESDL_PPU_CLOCK = NESDL_MASTER_CLOCK / 4; // 4 clocks per dot, 3x
 
 // CPU clock cycles for the PPU to "warm up" (more specifically, the
 // "pre-render scanline of the next frame" on NTSC)
-const uint32_t NESDL_PPU_CYCLE_READY = 29658;
+const uint32_t NESDL_PPU_READY = 29658;
 
 // SDL takes color in format ARGB
 static uint32_t MakeColor(uint8_t r, uint8_t g, uint8_t b)
 {
     return (r << 16) | (g << 8) | (b << 0);
 };
-
 
 // https://www.nesdev.org/wiki/PPU_palettes#Recommended_emulator_palette
 const uint32_t NESDL_PALETTE[0x40] =
