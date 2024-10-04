@@ -274,7 +274,7 @@ void NESDL_PPU::HandleProcessVisibleScanline()
                     // We only keep going if this sprite has a lower OAM index than any written before it here
                     // (AKA this sprite has priority)
                     uint8_t pixelOAM = frameDataSprite[currentPixel] & 0x3F;
-                    if (sprData.oamIndex >= pixelOAM)
+                    if (sprData.oamIndex > pixelOAM)
                     {
                         continue;
                     }
@@ -309,22 +309,21 @@ void NESDL_PPU::HandleProcessVisibleScanline()
         // Secondary OAM is cleared to 0xFF over 64 cycles, but we can get away with just doing it all at once
         if (currentScanlineCycle < 64)
         {
+            if (currentScanlineCycle == 63)
+            {
+                memset(secondaryOAM, 0xFF, sizeof(secondaryOAM));
+                // Reset counters and flags before sprite evaluation
+                oamN = 0;
+                oamM = 0;
+                secondaryOAMNextSlot = 0;
+                sprFetchIndex = 0;
+                registers.status &= ~PPUSTATUS_SPROVERFLOW;
+            }
         }
-        else if (currentScanlineCycle == 64)
-        {
-            memset(secondaryOAM, 0xFF, sizeof(secondaryOAM));
-            // Reset counters and flags before sprite evaluation
-            oamN = 0;
-            oamM = 0;
-            secondaryOAMNextSlot = 0;
-            sprFetchIndex = 0;
-            registers.status &= ~PPUSTATUS_SPROVERFLOW;
-            
-        }
-        else if (currentScanlineCycle <= 256)
+        else if (currentScanlineCycle < 256)
         {
             // Fetch next line's sprite data
-            if (currentScanlineCycle % 2 == 1)
+            if (currentScanlineCycle % 2 == 0)
             {
                 // Odd cycle - read from OAM
                 if (secondaryOAMNextSlot < 8)
@@ -372,7 +371,7 @@ void NESDL_PPU::HandleProcessVisibleScanline()
                 }
             }
         }
-        else if (currentScanlineCycle <= 320)
+        else if (currentScanlineCycle < 320)
         {
             if (currentScanlineCycle == 257)
             {
