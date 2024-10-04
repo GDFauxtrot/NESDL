@@ -83,7 +83,7 @@ void NESDL_CPU::Update(uint32_t ppuCycles)
                 }
             }
             
-//            if (elapsedCycles >= 831487)
+//            if (elapsedCycles >= 956399)
 //            {
 //                // Debug Nintendulator format
 //                printf("\n%04X\t\t\t\t\t\t\t\t\t\t\tA:%02X X:%02X Y:%02X P:%02X SP:%02X PPU:%3d,%3d CYC:%llu", registers.pc, registers.a, registers.x, registers.y, registers.p, registers.sp, core->ppu->posInScanline, core->ppu->currentScanline, elapsedCycles);
@@ -321,10 +321,10 @@ void NESDL_CPU::RunNextInstruction()
             OP_RTS(opcode, AddrMode::IMPLICIT);
             break;
         case 0x61:
-            OP_ADC(opcode, AddrMode::INDIRECTX);
+            OP_ADC(opcode, AddrMode::INDIRECTX, false);
             break;
         case 0x65:
-            OP_ADC(opcode, AddrMode::ZEROPAGE);
+            OP_ADC(opcode, AddrMode::ZEROPAGE, false);
             break;
         case 0x66:
             OP_ROR(opcode, AddrMode::ZEROPAGE);
@@ -333,7 +333,7 @@ void NESDL_CPU::RunNextInstruction()
             OP_PLA(opcode, AddrMode::IMPLICIT);
             break;
         case 0x69:
-            OP_ADC(opcode, AddrMode::IMMEDIATE);
+            OP_ADC(opcode, AddrMode::IMMEDIATE, false);
             break;
         case 0x6A:
             OP_ROR(opcode, AddrMode::ACCUMULATOR);
@@ -342,7 +342,7 @@ void NESDL_CPU::RunNextInstruction()
             OP_JMP(opcode, true);
             break;
         case 0x6D:
-            OP_ADC(opcode, AddrMode::ABSOLUTE);
+            OP_ADC(opcode, AddrMode::ABSOLUTE, false);
             break;
         case 0x6E:
             OP_ROR(opcode, AddrMode::ABSOLUTE);
@@ -351,10 +351,10 @@ void NESDL_CPU::RunNextInstruction()
             OP_BVS(opcode, AddrMode::RELATIVE);
             break;
         case 0x71:
-            OP_ADC(opcode, AddrMode::INDIRECTY);
+            OP_ADC(opcode, AddrMode::INDIRECTY, false);
             break;
         case 0x75:
-            OP_ADC(opcode, AddrMode::ZEROPAGEX);
+            OP_ADC(opcode, AddrMode::ZEROPAGEX, false);
             break;
         case 0x76:
             OP_ROR(opcode, AddrMode::ZEROPAGEX);
@@ -363,10 +363,10 @@ void NESDL_CPU::RunNextInstruction()
             OP_SEI(opcode, AddrMode::IMPLICIT);
             break;
         case 0x79:
-            OP_ADC(opcode, AddrMode::ABSOLUTEY);
+            OP_ADC(opcode, AddrMode::ABSOLUTEY, false);
             break;
         case 0x7D:
-            OP_ADC(opcode, AddrMode::ABSOLUTEX);
+            OP_ADC(opcode, AddrMode::ABSOLUTEX, false);
             break;
         case 0x7E:
             OP_ROR(opcode, AddrMode::ABSOLUTEX);
@@ -826,7 +826,7 @@ uint8_t NESDL_CPU::GetCyclesForAddressMode(uint8_t opcode, AddrMode mode, bool p
     }
 }
 
-void NESDL_CPU::OP_ADC(uint8_t opcode, AddrMode mode)
+void NESDL_CPU::OP_ADC(uint8_t opcode, AddrMode mode, bool sbc)
 {
     GetByteForAddressMode(mode, addrModeResult);
     AdvanceCyclesForAddressMode(opcode, mode, core->ram->oops, false, false);
@@ -834,6 +834,10 @@ void NESDL_CPU::OP_ADC(uint8_t opcode, AddrMode mode)
     // Add A, M and C together to get the result of addition with carry
     uint8_t oldAcc = registers.a;
     uint8_t val = addrModeResult->value;
+    if (sbc)
+    {
+        val = ~val;
+    }
     uint8_t carry = registers.p & PSTATUS_CARRY;
     uint8_t result = oldAcc + val + carry; // A+M+C
     registers.a = result;
@@ -1462,29 +1466,32 @@ void NESDL_CPU::OP_RTS(uint8_t opcode, AddrMode mode)
 
 void NESDL_CPU::OP_SBC(uint8_t opcode, AddrMode mode)
 {
-    GetByteForAddressMode(mode, addrModeResult);
-    AdvanceCyclesForAddressMode(opcode, mode, core->ram->oops, false, false);
+    // SBC is the exact same as ADC except the value for M is bit-flipped
+    OP_ADC(opcode, mode, true);
     
-    // Subtract A, M and (1-C) together to get the result of subtraction with carry
-    uint8_t oldAcc = registers.a;
-    uint8_t val = addrModeResult->value;
-    uint8_t carry = registers.p & PSTATUS_CARRY;
-    uint8_t result = oldAcc - val - (1-carry); // A-M-(1-C)
-    registers.a = result;
-    
-    // Set the flags as a result of this operation
-    
-    // If the result of A+M < A, or (A+M)+C < (A+M), then we have a carry (C)
-    SetPSFlag(PSTATUS_CARRY, (oldAcc + val) < oldAcc || result < (oldAcc + val) || (oldAcc == 0 && val == 0 && carry == 1));
-
-    // Gonna cheat on this one and just check if the value goes beyond the range of an int8
-    // (I'm not terribly clever but it is terribly late and I'm terribly tired)
-    int16_t result16 = (int8_t)oldAcc - (int8_t)val - (1-carry);
-    SetPSFlag(PSTATUS_OVERFLOW, result16 < -128 || result16 > 127);
-    
-    // Set zero and negative flags as usual
-    SetPSFlag(PSTATUS_ZERO, result == 0);
-    SetPSFlag(PSTATUS_NEGATIVE, sign((int8_t)result) < 0);
+//    GetByteForAddressMode(mode, addrModeResult);
+//    AdvanceCyclesForAddressMode(opcode, mode, core->ram->oops, false, false);
+//    
+//    // Subtract A, M and (1-C) together to get the result of subtraction with carry
+//    uint8_t oldAcc = registers.a;
+//    uint8_t val = addrModeResult->value;
+//    uint8_t carry = registers.p & PSTATUS_CARRY;
+//    uint8_t result = oldAcc - val - (1-carry); // A-M-(1-C)
+//    registers.a = result;
+//    
+//    // Set the flags as a result of this operation
+//    
+//    // If the result of A+M < A, or (A+M)+C < (A+M), then we have a carry (C)
+//    SetPSFlag(PSTATUS_CARRY, (oldAcc + val) < oldAcc || result < (oldAcc + val) || (oldAcc == val && carry == 1));
+//
+//    // Gonna cheat on this one and just check if the value goes beyond the range of an int8
+//    // (I'm not terribly clever but it is terribly late and I'm terribly tired)
+//    int16_t result16 = (int8_t)oldAcc - (int8_t)val - (1-carry);
+//    SetPSFlag(PSTATUS_OVERFLOW, result16 < -128 || result16 > 127);
+//    
+//    // Set zero and negative flags as usual
+//    SetPSFlag(PSTATUS_ZERO, result == 0);
+//    SetPSFlag(PSTATUS_NEGATIVE, sign((int8_t)result) < 0);
 }
 
 void NESDL_CPU::OP_SEC(uint8_t opcode, AddrMode mode)

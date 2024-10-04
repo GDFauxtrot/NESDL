@@ -25,6 +25,15 @@ struct PPUTileFetch
     uint8_t paletteIndex;
 };
 
+struct PPUSprFetch
+{
+    uint8_t oamIndex;
+    uint16_t startX;
+    uint16_t pattern;
+    uint8_t paletteIndex;
+    bool bgPriority;
+};
+
 // 4-byte struct for Object Attribute Memory
 struct OAMEntry
 {
@@ -92,13 +101,15 @@ public:
     uint8_t ReadFromVRAM(uint16_t addr);
     void WriteToVRAM(uint16_t addr, uint8_t data);
     void WriteCHRROM(uint8_t* addr);
-    void FetchAndStoreTile();
-    uint16_t WeavePatternBits(uint8_t low, uint8_t high);
+    void FetchAndStoreTile(uint8_t pixelInFetchCycle);
+    uint16_t WeavePatternBits(uint8_t low, uint8_t high, bool flip);
     uint32_t GetPalette(uint8_t index, bool spriteLayer);
     uint32_t GetColor(uint16_t pattern, uint32_t palette, uint8_t pixelIndex);
+    uint8_t GetPatternBits(uint16_t pattern, uint8_t pixelIndex);
     void PreprocessPPUForReadInstructionTiming(uint8_t instructionPPUTime);
     PPURegisters registers;
     uint32_t frameData[NESDL_SCREEN_WIDTH * NESDL_SCREEN_HEIGHT]; // Frame buffer
+    uint8_t frameDataSprite[NESDL_SCREEN_WIDTH * NESDL_SCREEN_HEIGHT]; // Some per-pixel data
     bool ignoreChanges;
     bool incrementV;
     uint64_t currentFrame;
@@ -107,7 +118,7 @@ public:
 private:
     NESDL_Core* core;
     uint64_t elapsedCycles;
-    uint16_t currentDrawX;
+    int32_t currentDrawX;
 //    uint16_t currentScanline;
     uint8_t chrData[0x2000]; // 8KB (at a time) of CHR-ROM/RAM memory
     uint8_t vram[0x1000];  // 4kb VRAM for the PPU (physically 2kb on stock but supports 4 nametables)
@@ -115,8 +126,10 @@ private:
     PPUTileFetch tileFetch;
     PPUTileFetch tileBuffer[2]; // Representation of the tile data sitting in shift registers
     uint8_t ppuDataReadBuffer; // Special internal buffer for PPUDATA reads
-    uint8_t oam[256]; // 64 slots (256 bytes) for PPU "Object Attribute Memory"
-    uint8_t secondaryOAM[32]; // 8 slots (32 bytes) of next scanline's chosen sprites
+    uint8_t oam[64 * 4]; // 64 slots (256 bytes) for PPU "Object Attribute Memory"
+    uint8_t secondaryOAM[8 * 5]; // 8 slots (32 + 8 bytes) of next scanline's chosen sprites
+    PPUSprFetch sprDataToDraw[8]; // 8 slots of next scanline's actual sprite draw data
+    uint8_t sprDataToDrawCount;
     uint8_t oamN; // N counter for OAM writes (as described on NESDEV sprite evaluation)
     uint8_t oamM; // M counter for OAM writes
     uint8_t secondaryOAMNextSlot; // Index for the next available slot in secondary OAM

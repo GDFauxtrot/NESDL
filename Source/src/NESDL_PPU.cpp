@@ -106,6 +106,9 @@ void NESDL_PPU::HandleProcessVisibleScanline()
 //        uint32_t c = GetColor(0,p,0);
 //        memset32(frameData, c, sizeof(frameData));
         
+        // Clear frameDataSprite table for next frame
+        memset(frameDataSprite, 0x3F, sizeof(frameDataSprite));
+        
         if ((registers.mask & PPUMASK_BGENABLE) != 0x00)
         {
             // THE ONLY TIME we advance the cycle count artificially - this cycle is skipped
@@ -135,7 +138,7 @@ void NESDL_PPU::HandleProcessVisibleScanline()
 //        else if (currentScanlineCycle < 256)
         if (currentScanlineCycle > 0 && currentScanlineCycle < 256)
         {
-            FetchAndStoreTile(); // Runs across multiple cycles in order to achieve this
+            FetchAndStoreTile(pixelInFetchCycle); // Runs across multiple cycles in order to achieve this
             
             // On the last cycle, render the tile sitting in the shift register and store the loaded tile data in
             if (pixelInFetchCycle == 7) // Cycle 7-8 - Fetch pattern table high bytes (finishes on next cycle 0)
@@ -144,17 +147,37 @@ void NESDL_PPU::HandleProcessVisibleScanline()
                 // currentDrawX index
                 PPUTileFetch toRender = tileFetch;
                 //            PPUTileFetch toRender = tileBuffer[1];
-                for (int i = 0; i < 8; ++i)
+                
+                uint8_t start = 0;
+                uint8_t end = 8;
+                
+                uint8_t tileIndex = (currentScanlineCycle - 7) / 8;
+                if (tileIndex == 0)
+                {
+                    start = (registers.x & 0x7);
+                }
+                if (tileIndex == 31)
+                {
+//                    end = 0;
+//                    end = 8 - (registers.x & 0x7);
+                }
+                
+                for (int i = start; i < end; ++i)
                 {
                     uint16_t currentPixel = (currentScanline * PPU_WIDTH) + currentDrawX;
-                    uint32_t palette = GetPalette(toRender.paletteIndex, false);
-                    uint32_t color = GetColor(toRender.pattern, palette, i);
-                    // Tile debugging lines
-//                    if (currentScanline % 8 == 0 || currentDrawX % 8 == 0)
-//                    {
-//                        color += 0x00202020;
-//                    }
-                    frameData[currentPixel] = color;
+                    
+                    // Don't render if we wrote a sprite pixel (w/ priority) here!
+                    if ((frameDataSprite[currentPixel] & 0xC0) == 0)
+                    {
+                        uint32_t palette = GetPalette(toRender.paletteIndex, false);
+                        uint32_t color = GetColor(toRender.pattern, palette, i);
+                        // Tile debugging lines
+//                        if (currentScanline % 8 == 0 || currentDrawX % 8 == 0)
+//                        {
+//                            color += 0x00202020;
+//                        }
+                        frameData[currentPixel] = color;
+                    }
                     currentDrawX++;
                 }
 //                tileBuffer[1] = tileBuffer[0];
@@ -170,6 +193,34 @@ void NESDL_PPU::HandleProcessVisibleScanline()
                 else
                 {
                     registers.v += 1;               // increment coarse X
+                }
+                
+                // Not sure how else to pull this off? We want to render the last tile at 0x#400/0x#C00
+                // I think I messed up the part where the PPU preloads two tiles for rendering at the end of the last
+                // scanline, since this part should've been done already I believe
+                if (tileIndex == 31 && (registers.x & 0x7) != 0x00)
+                {
+                    FetchAndStoreTile(1);
+                    FetchAndStoreTile(3);
+                    FetchAndStoreTile(5);
+                    
+                    toRender = tileFetch;
+                    
+                    uint8_t i = 0;
+                    while (currentDrawX < 256)
+                    {
+                        uint16_t currentPixel = (currentScanline * PPU_WIDTH) + currentDrawX;
+                        
+                        // Don't render if we wrote a sprite pixel (w/ priority) here!
+                        if ((frameDataSprite[currentPixel] & 0xC0) == 0)
+                        {
+                            uint32_t palette = GetPalette(toRender.paletteIndex, false);
+                            uint32_t color = GetColor(toRender.pattern, palette, i);
+                            frameData[currentPixel] = color;
+                        }
+                        currentDrawX++;
+                        i++;
+                    }
                 }
             }
         }
@@ -205,6 +256,7 @@ void NESDL_PPU::HandleProcessVisibleScanline()
             // Reset horizontal scroll
             registers.v = (registers.v & 0xFBE0) | (registers.t & 0x41F);
             currentDrawX = 0;
+//            currentDrawX = 7 - (registers.x & 0x7);
         }
         else if (currentScanlineCycle < 321)
         {
@@ -212,7 +264,7 @@ void NESDL_PPU::HandleProcessVisibleScanline()
         }
         else if (currentScanlineCycle < 337)
         {
-            FetchAndStoreTile(); // Run tile fetch for the next two tiles (takes exactly 16 cycles which is what we want)
+            FetchAndStoreTile(pixelInFetchCycle); // Run tile fetch for the next two tiles (takes exactly 16 cycles which is what we want)
             
             if (pixelInFetchCycle == 7)
             {
@@ -229,6 +281,81 @@ void NESDL_PPU::HandleProcessVisibleScanline()
     // SPRITE LOGIC - don't run if sprite rendering is disabled (or we're on line 0, we don't run)
     if ((registers.mask & PPUMASK_SPRENABLE) != 0x00 && currentScanline > 0)
     {
+        // Draw this line's sprite data
+        if (currentScanlineCycle < 256)
+        {
+            for (int i = 0; i < sprDataToDrawCount; ++i)
+            {
+                PPUSprFetch sprData = sprDataToDraw[i];
+                
+                // Don't bother if we're not rendering this one
+                if (currentScanlineCycle < sprData.startX || currentScanlineCycle >= sprData.startX + 8)
+                {
+                    continue;
+                }
+                
+                // Rather than doing all 8 pixels, we render sprites per-pixel across the scanline (for sprite 0 hit accuracy)
+                uint16_t currentPixel = (currentScanline * PPU_WIDTH) + currentScanlineCycle;
+                uint8_t index = (currentScanlineCycle - sprData.startX) % 8;
+                
+                // We're going out of bounds on screen - return early
+                if (currentPixel >= (PPU_WIDTH * PPU_HEIGHT))
+                {
+                    break;
+                }
+
+                // We only go further IFF the pixel to render isn't the backdrop index!
+                if (GetPatternBits(sprData.pattern, index) != 0x0)
+                {
+                    // If this is sprite zero, we haven't hit sprite 0 this frame yet, then mark that we rendered it at least one pixel!
+                    if (sprData.oamIndex == 0 && (registers.status & PPUSTATUS_SPR0HIT) == 0x00)
+                    {
+                        registers.status |= PPUSTATUS_SPR0HIT;
+                    }
+                    
+                    // We only keep going if this sprite has a lower OAM index than any written before it here
+                    // (AKA this sprite has priority)
+//                    uint8_t d = frameDataSprite[currentPixel] & 0x3F;
+//                    if (d <= sprData.oamIndex)
+//                    {
+//                        continue;
+//                    }
+                    
+                    // This sprite pixel is significant - mark the OAM index, regardless of if we've written to it or not yet or BG tile priorty (lends itself to a notable "sprite priority quirk" with this implementation)
+                    frameDataSprite[currentPixel] = (frameDataSprite[currentPixel] & 0xC0) | (sprData.oamIndex & 0x3F);
+                    
+                    if (sprData.bgPriority)
+                    {
+                        // We may discard this pixel if the tile takes priority
+                        if (frameData[currentPixel] != NESDL_PALETTE[paletteData[0]])
+                        {
+                            continue;
+                        }
+                        // TODO do we need a better way to detect this? Some tiles may use the same color
+                        // as 0x3F00, but not be transparent. Curious how the NES does this w/o
+                        // multiple screen buffers?
+                    }
+                    else
+                    {
+                        
+                    }
+                    
+                    // Write a bit signifying that we wrote a SPR pixel here!
+                    frameDataSprite[currentPixel] = 0x40 | (sprData.oamIndex & 0x3F);
+                    
+                    uint32_t palette = GetPalette(sprData.paletteIndex, true);
+                    uint32_t color = GetColor(sprData.pattern, palette, index);
+                    
+                    frameData[currentPixel] = color;
+                }
+                else
+                {
+                    // Mark that we didn't write a pixel here
+//                    frameDataSprite[currentPixel] = 0;
+                }
+            }
+        }
+        
         // Secondary OAM is cleared to 0xFF over 64 cycles, but we can get away with just doing it all at once
         if (currentScanlineCycle < 64)
         {
@@ -241,17 +368,18 @@ void NESDL_PPU::HandleProcessVisibleScanline()
             oamM = 0;
             secondaryOAMNextSlot = 0;
             sprFetchIndex = 0;
-            registers.status &= ~(PPUSTATUS_SPROVERFLOW | PPUSTATUS_SPR0HIT);
+            registers.status &= ~PPUSTATUS_SPROVERFLOW;
             
         }
         else if (currentScanlineCycle <= 256)
         {
+            // Fetch next line's sprite data
             if (currentScanlineCycle % 2 == 1)
             {
                 // Odd cycle - read from OAM
                 if (secondaryOAMNextSlot < 8)
                 {
-                    secondaryOAM[secondaryOAMNextSlot*4] = oam[oamN*4 + oamM];
+                    secondaryOAM[secondaryOAMNextSlot*5] = oam[oamN*4 + oamM];
                 }
             }
             else
@@ -262,16 +390,17 @@ void NESDL_PPU::HandleProcessVisibleScanline()
                     // Check the sprite Y we evaluated last. If the sprite falls on this scanline,
                     // then it's "in range" and we fill secondary OAM with its info before moving on
                     // to the next slot
-                    uint8_t sprY = secondaryOAM[secondaryOAMNextSlot*4];
+                    uint8_t sprY = secondaryOAM[secondaryOAMNextSlot*5];
                     uint8_t sprHeight = (registers.ctrl & PPUCTRL_SPRHEIGHT) != 0x00 ? 16 : 8;
-                    if (currentScanline >= sprY+1 && currentScanline < (sprY+1) + sprHeight)
+                    if (currentScanline >= sprY && currentScanline < sprY + sprHeight)
                     {
                         // Sprite in range - copy the rest of the data to secondary OAM
                         for (int i = 1; i < 4; ++i)
                         {
-                            secondaryOAM[secondaryOAMNextSlot*4 + i] = oam[oamN*4 + (++oamM)];
+                            secondaryOAM[secondaryOAMNextSlot*5 + i] = oam[oamN*4 + (++oamM)];
                             if (oamM == 3)
                             {
+                                secondaryOAM[secondaryOAMNextSlot*5 + 4] = oamN;
                                 oamM = 0;
                                 oamN++;
                             }
@@ -295,7 +424,11 @@ void NESDL_PPU::HandleProcessVisibleScanline()
         }
         else if (currentScanlineCycle <= 320)
         {
-            // Sprite fetching/drawing! First 4 cycles are for reading, last 4 are for writing
+            if (currentScanlineCycle == 257)
+            {
+                sprDataToDrawCount = 0;
+            }
+            // Sprite fetching! First 4 cycles are for reading, last 4 are for writing
             uint8_t pixelInFetchCycle = currentScanlineCycle % 8;
             
             if (pixelInFetchCycle == 4)
@@ -306,10 +439,11 @@ void NESDL_PPU::HandleProcessVisibleScanline()
                 if (sprFetchIndex < secondaryOAMNextSlot)
                 {
                     // Get sprite info
-                    uint8_t sprY    = secondaryOAM[sprFetchIndex*4];
-                    uint8_t sprTile = secondaryOAM[sprFetchIndex*4 + 1];
-                    uint8_t sprAttr = secondaryOAM[sprFetchIndex*4 + 2];
-                    uint8_t sprX    = secondaryOAM[sprFetchIndex*4 + 3];
+                    uint8_t sprY        = secondaryOAM[sprFetchIndex*5];
+                    uint8_t sprTile     = secondaryOAM[sprFetchIndex*5 + 1];
+                    uint8_t sprAttr     = secondaryOAM[sprFetchIndex*5 + 2];
+                    uint8_t sprX        = secondaryOAM[sprFetchIndex*5 + 3];
+                    uint8_t sprOAMIndex = secondaryOAM[sprFetchIndex*5 + 4];
                     
                     // Get sprite attributes
                     uint8_t sprPaletteIndex = sprAttr & SPR_PALETTE;
@@ -319,8 +453,8 @@ void NESDL_PPU::HandleProcessVisibleScanline()
                     bool sprIs8By16 = (registers.ctrl & PPUCTRL_SPRHEIGHT) != 0x00;
                     
                     // Find out where we'll be starting to render on this line
-                    uint16_t sprStartX = (currentScanline * PPU_WIDTH) + sprX;
-                    uint16_t sprRow = (currentScanline - sprY - 1) % (sprIs8By16 ? 16 : 8);
+//                    uint16_t sprStartX = (currentScanline * PPU_WIDTH) + sprX;
+                    uint16_t sprRow = (currentScanline - sprY) % (sprIs8By16 ? 16 : 8);
                     
                     // Flip tile read if the sprite's vertical flip bit is set
                     if (sprFlipVertical)
@@ -351,45 +485,54 @@ void NESDL_PPU::HandleProcessVisibleScanline()
                     }
                     uint8_t ptrnLow = ReadFromVRAM(patternAddr);
                     uint8_t ptrnHi = ReadFromVRAM(patternAddr + 8);
-                    uint16_t sprPattern = WeavePatternBits(ptrnLow, ptrnHi);
+                    uint16_t sprPattern = WeavePatternBits(ptrnLow, ptrnHi, sprFlipHorizontal);
+                    
+//                    printf("\n%d\t%d", sprFetchIndex, sprOAMIndex);
+//                    sprDataToDraw[sprDataToDrawCount].oamIndex = sprFetchIndex;
+                    sprDataToDraw[sprDataToDrawCount].oamIndex = sprOAMIndex;
+                    sprDataToDraw[sprDataToDrawCount].pattern = sprPattern;
+                    sprDataToDraw[sprDataToDrawCount].startX = sprX;
+                    sprDataToDraw[sprDataToDrawCount].paletteIndex = sprPaletteIndex;
+                    sprDataToDraw[sprDataToDrawCount].bgPriority = sprTilePriority;
+                    sprDataToDrawCount++;
                     
                     // Go through all 8 pixels for this sprite and draw them according to the sprite's attributes
-                    for (uint8_t i = 0; i < 8; ++i)
-                    {
-                        uint8_t index = sprFlipHorizontal ? (7-i) : i;
-                        
-                        // Get pixel position on the scanline + loop X offset
-                        uint16_t currentPixel = sprStartX + index;
-                        
-                        // We're going out of bounds on screen - return early
-                        if (currentPixel >= (PPU_WIDTH * PPU_HEIGHT))
-                        {
-                            break;
-                        }
-                        
-                        uint32_t palette = GetPalette(sprPaletteIndex, true);
-                        uint32_t color = GetColor(sprPattern, palette, index);
-                        
-                        if (sprTilePriority)
-                        {
-                            // We may discard this pixel if the tile takes priority
-                            if (frameData[currentPixel] != NESDL_PALETTE[paletteData[0]])
-                            {
-                                continue;
-                            }
-                            // TODO need a better way to detect this? Some tiles may use the same color
-                            // as 0x3F00 but not be transparent. Curious how the NES does this w/o
-                            // multiple screen buffers
-                            
-                            // If this is sprite zero, mark that we rendered it at least one pixel!
-                            if (sprFetchIndex == 0)
-                            {
-                                registers.status |= PPUSTATUS_SPR0HIT;
-                            }
-                        }
-                        
-                        frameData[currentPixel] = color;
-                    }
+//                    for (uint8_t i = 0; i < 8; ++i)
+//                    {
+//                        uint8_t index = sprFlipHorizontal ? (7-i) : i;
+//                        
+//                        // Get pixel position on the scanline + loop X offset
+//                        uint16_t currentPixel = sprStartX + index;
+//                        
+//                        // We're going out of bounds on screen - return early
+//                        if (currentPixel >= (PPU_WIDTH * PPU_HEIGHT))
+//                        {
+//                            break;
+//                        }
+//                        
+//                        uint32_t palette = GetPalette(sprPaletteIndex, true);
+//                        uint32_t color = GetColor(sprPattern, palette, index);
+//                        
+//                        if (sprTilePriority)
+//                        {
+//                            // We may discard this pixel if the tile takes priority
+//                            if (frameData[currentPixel] != NESDL_PALETTE[paletteData[0]])
+//                            {
+//                                continue;
+//                            }
+//                            // TODO need a better way to detect this? Some tiles may use the same color
+//                            // as 0x3F00 but not be transparent. Curious how the NES does this w/o
+//                            // multiple screen buffers
+//                        }
+//                        // If this is sprite zero, we haven't hit sprite 0 this frame yet, and we have a non-BG pixel to render, then mark that we rendered it at least one pixel!
+//                        if (!didSpr0Hit && hasSpr0 && sprFetchIndex == 0 && GetPatternBits(sprPattern, index) != 0x0)
+//                        {
+//                            registers.status |= PPUSTATUS_SPR0HIT;
+//                            didSpr0Hit = true;
+//                        }
+//                        
+//                        frameData[currentPixel] = color;
+//                    }
                     
                     // Advance sprite fetch index since we successfully drew this one
                     sprFetchIndex++;
@@ -400,11 +543,11 @@ void NESDL_PPU::HandleProcessVisibleScanline()
     }
 }
 
-void NESDL_PPU::FetchAndStoreTile()
+void NESDL_PPU::FetchAndStoreTile(uint8_t pixelInFetchCycle)
 {
-    uint16_t currentScanlineCycle = elapsedCycles % 341; // TODO un-magic this number
+//    uint16_t currentScanlineCycle = elapsedCycles % 341; // TODO un-magic this number
     // Every 8 pixels (skipping px 0) we repeat the same process for tiles
-    uint8_t pixelInFetchCycle = currentScanlineCycle % 8;
+//    uint8_t pixelInFetchCycle = currentScanlineCycle % 8;
     
     /*
      FROM: https://www.nesdev.org/wiki/PPU_programmer_reference#Internal_registers
@@ -429,7 +572,7 @@ void NESDL_PPU::FetchAndStoreTile()
     }
     if (pixelInFetchCycle == 3) // Cycle 3-4 - Fetch attribute table
     {
-        uint8_t ntSelect = (registers.v & 0xC00); // NT select occupies same bits at AT address, no shifting needed
+        uint16_t ntSelect = (registers.v & 0xC00); // NT select occupies same bits at AT address, no shifting needed
         uint8_t colSelect = (registers.v >> 2) & 0x7;
         uint8_t rowSelect = (registers.v >> 7) & 0x7;
         uint16_t atAddr = 0x23C0 | ntSelect | (rowSelect << 3) | colSelect;
@@ -464,7 +607,7 @@ void NESDL_PPU::FetchAndStoreTile()
         uint8_t ptrnHi = ReadFromVRAM(patternAddr + 8);
         
         // Weave bits together and store
-        tileFetch.pattern = WeavePatternBits(ptrnLow, ptrnHi);
+        tileFetch.pattern = WeavePatternBits(ptrnLow, ptrnHi, false);
     }
     if (pixelInFetchCycle == 7) // Cycle 7-8 - Fetch pattern table high bytes (finishes on next cycle 0)
     {
@@ -476,7 +619,6 @@ void NESDL_PPU::FetchAndStoreTile()
 void NESDL_PPU::HandleProcessVBlankScanline()
 {
     uint16_t currentScanlineCycle = elapsedCycles % 341; // TODO un-magic this number
-    
     // Every 8 pixels (skipping px 0) we repeat the same process for tiles
     uint8_t pixelInFetchCycle = currentScanlineCycle % 8;
     
@@ -527,7 +669,7 @@ void NESDL_PPU::HandleProcessVBlankScanline()
                 return;
             }
             
-            FetchAndStoreTile(); // Runs across multiple cycles in order to achieve this
+            FetchAndStoreTile(pixelInFetchCycle); // Runs across multiple cycles in order to achieve this
             
             // On the last cycle, render the tile sitting in the shift register and store the loaded tile data in
             if (pixelInFetchCycle == 7) // Cycle 7-8 - Fetch pattern table high bytes (finishes on next cycle 0)
@@ -606,13 +748,13 @@ void NESDL_PPU::HandleProcessVBlankScanline()
                 return;
             }
             
-            FetchAndStoreTile(); // Run tile fetch for the next two tiles (takes exactly 16 cycles which is what we want)
+//            FetchAndStoreTile(); // Run tile fetch for the next two tiles (takes exactly 16 cycles which is what we want)
             
             if (pixelInFetchCycle == 7)
             {
 //                tileBuffer[1] = tileBuffer[0];
 //                tileBuffer[0] = tileFetch;
-                registers.v += 1;               // increment coarse X
+//                registers.v += 1;               // increment coarse X
             }
         }
         else if (currentScanlineCycle < 341)
@@ -959,7 +1101,7 @@ void NESDL_PPU::WriteCHRROM(uint8_t* addr)
     memcpy(chrData, addr, sizeof(chrData));
 }
 
-uint16_t NESDL_PPU::WeavePatternBits(uint8_t low, uint8_t high)
+uint16_t NESDL_PPU::WeavePatternBits(uint8_t low, uint8_t high, bool flip)
 {
     // For a given set of 8 low and 8 high bits, "weave" them together
     // Example:
@@ -970,7 +1112,14 @@ uint16_t NESDL_PPU::WeavePatternBits(uint8_t low, uint8_t high)
     {
         uint8_t low16 = (low & (1 << i)) >> i;
         uint8_t high16 = (high & (1 << i)) >> i;
-        result |= (low16 << (i*2)) | (high16 << ((i*2) + 1));
+        if (flip)
+        {
+            result |= (low16 << (14 - i*2)) | (high16 << ((14 - i*2) + 1));
+        }
+        else
+        {
+            result |= (low16 << (i*2)) | (high16 << ((i*2) + 1));
+        }
     }
     return result;
 }
@@ -985,8 +1134,7 @@ uint32_t NESDL_PPU::GetPalette(uint8_t index, bool spriteLayer)
 uint32_t NESDL_PPU::GetColor(uint16_t pattern, uint32_t palette, uint8_t pixelIndex)
 {
     // Use pixel index to select 2 bits of pattern - 0 selects 2 highest, 7 selects 2 lowest
-    uint8_t index = ((7 - pixelIndex) * 2);
-    uint8_t patternBits = (pattern & (0x3 << index)) >> index;
+    uint8_t patternBits = GetPatternBits(pattern, pixelIndex);
     // Take this 0-3 index and select the palette byte
     uint32_t paletteShifted = palette >> (24 - patternBits*8);
     uint8_t paletteIndex = paletteShifted & 0xFF;
@@ -1025,4 +1173,10 @@ uint32_t NESDL_PPU::GetColor(uint16_t pattern, uint32_t palette, uint8_t pixelIn
     
     
     return resultColor;
+}
+
+uint8_t NESDL_PPU::GetPatternBits(uint16_t pattern, uint8_t pixelIndex)
+{
+    uint8_t index = ((7 - pixelIndex) * 2);
+    return (pattern & (0x3 << index)) >> index;
 }

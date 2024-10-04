@@ -51,7 +51,7 @@ public:
     void HaltCPUForDMAWrite();
     
     // All opcode declarations
-    void OP_ADC(uint8_t opcode, AddrMode mode);
+    void OP_ADC(uint8_t opcode, AddrMode mode, bool sbc);
     void OP_AND(uint8_t opcode, AddrMode mode);
     void OP_ASL(uint8_t opcode, AddrMode mode);
     void OP_BCC(uint8_t opcode, AddrMode mode);
