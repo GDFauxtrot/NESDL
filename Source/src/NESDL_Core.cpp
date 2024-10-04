@@ -57,12 +57,16 @@ void NESDL_Core::LoadRom(const char* path)
 	uint8_t romBankCount = header.banks;
 	uint8_t vromBankCount = header.vbanks;
 
+    
 	// TODO read header for any trainer or mapping data! Then skip ahead if needed
 	// Check for trainer flag in bit 2, skip it if detected
 	if ((header.ctrl1 & 0x4) == 0x4) 
 	{
 		file.seekg(512, ios_base::cur);
 	}
+    
+    // Relay mirroring info to PPU
+    ppu->SetMirroringMode(header.ctrl1 & 0x1);
 
 	// Read off the 16KB allocated PRG-ROM banks
     if (romBankCount > 0)

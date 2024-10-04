@@ -99,6 +99,7 @@ public:
     uint8_t ReadFromVRAM(uint16_t addr);
     void WriteToVRAM(uint16_t addr, uint8_t data);
     void WriteCHRROM(uint8_t* addr);
+    void SetMirroringMode(bool vertical);
     void FetchAndStoreTile(uint8_t pixelInFetchCycle);
     uint16_t WeavePatternBits(uint8_t low, uint8_t high, bool flip);
     uint32_t GetPalette(uint8_t index, bool spriteLayer);
@@ -114,6 +115,7 @@ public:
     uint16_t currentScanline;
     uint16_t currentScanlineCycle;
 private:
+    bool ntMirrorVertical;
     NESDL_Core* core;
     uint64_t elapsedCycles;
     int32_t currentDrawX;
