@@ -36,12 +36,21 @@ void NESDL_Core::Update(double deltaTime)
         // Send current timeSinceStartup to CPU and PPU to handle their own cycle updates
         cpu->Update(1);
         ppu->Update(1);
+        
+        // Only update SDL screen texture IF the visible screen has finished being drawn to
+        // Prevents visible screen tearing from mid-frame drawing
+        if (ppu->frameDataReady)
+        {
+            ppu->frameDataReady = false;
+            sdlCtx->UpdateScreen(ppu);
+        }
     }
 }
 
-void NESDL_Core::StartSystem()
+void NESDL_Core::StartSystem(NESDL_SDL* sdl)
 {
     cpu->Start();
+    sdlCtx = sdl;
 }
 
 void NESDL_Core::LoadRom(const char* path)

@@ -114,6 +114,7 @@ public:
     uint64_t currentFrame;
     uint16_t currentScanline;
     uint16_t currentScanlineCycle;
+    bool frameDataReady;
 private:
     bool ntMirrorVertical;
     NESDL_Core* core;

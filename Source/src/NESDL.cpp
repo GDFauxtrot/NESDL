@@ -21,7 +21,7 @@ int main(int argc, char* args[])
     // Load ROM into core
     core.LoadRom(romFile.c_str());
     
-    core.StartSystem();
+    core.StartSystem(&sdlCtx);
     
     this_thread::sleep_for(chrono::seconds(2));
     
@@ -66,8 +66,8 @@ int main(int argc, char* args[])
 
         // Send the deltaTime to the system to handle
         core.Update(deltaTime);
-        // Update screen with whatever's meant to be displayed from the PPU
-        sdlCtx.UpdateScreen(core.ppu);
+        
+        // Screen update is handled from the core instead of here
         
         printf("\n%llu %llu (%f fps)", core.ppu->currentFrame, core.cpu->elapsedCycles, (1000/deltaTime));
         

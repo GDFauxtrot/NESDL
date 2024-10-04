@@ -17,7 +17,7 @@ class NESDL_Core
 {
 public:
 	void Init();
-    void StartSystem();
+    void StartSystem(NESDL_SDL* sdl);
 	void Update(double deltaTime);
 	void LoadRom(const char* path);
     void HandleEvent(SDL_EventType eventType, SDL_KeyCode eventKeyCode);
@@ -28,6 +28,7 @@ public:
 	NESDL_APU* apu;
     NESDL_Input* input;
 private:
+    NESDL_SDL* sdlCtx;
 	double timeSinceStartup;
     // Populated on ROM load
     shared_ptr<vector<uint8_t>> prgROM;

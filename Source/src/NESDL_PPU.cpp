@@ -38,6 +38,14 @@ void NESDL_PPU::RunNextCycle()
     {
         HandleProcessVisibleScanline();
     }
+    else if (currentScanline == 240)
+    {
+        // Signal to core that we've finished drawing to our frame data
+        if (currentScanlineCycle == 0)
+        {
+            frameDataReady = true;
+        }
+    }
     else if (currentScanline > 240 && currentScanline < 262) // VBLANK scanlines (241-261)
     {
         HandleProcessVBlankScanline();
