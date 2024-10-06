@@ -2,7 +2,9 @@
 
 //Using SDL and standard IO
 #include <SDL2/SDL.h>
+#include <SDL2_ttf/SDL_ttf.h>
 #include <stdio.h>
+#include <unistd.h>
 
 #include <string>
 #include <vector>

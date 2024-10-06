@@ -2,16 +2,44 @@
 
 void NESDL_PPU::Init(NESDL_Core* c)
 {
-    elapsedCycles = 0;
     core = c;
+}
+
+void NESDL_PPU::Reset(bool hardReset)
+{
+    elapsedCycles = 0;
+    currentFrame = 0;
+    currentScanline = 0;
+    currentScanlineCycle = 0;
+    currentDrawX = 0;
+    registers.ctrl = 0;
+    registers.mask = 0;
+    if (hardReset)
+    {
+        registers.oamAddr = 0;
+        registers.v = 0;
+    }
+    else
+    {
+        registers.status &= PPUSTATUS_VBLANK; // Keep VBL, the rest go to 0
+    }
+    registers.t = 0;
+    registers.x = 0;
+    registers.y = 0;
+    registers.w = false;
     
     tileFetch.nametable = 0;
     tileFetch.attribute = 0;
     tileFetch.pattern = 0;
-    incrementV = true;
+    tileFetch.paletteIndex = 0;
+    
+    incrementV = true; // NESDL flag - a bit hacky though
+    ignoreChanges = false;
     oamN = 0;
     oamM = 0;
     secondaryOAMNextSlot = 0;
+    disregardVBL = false;
+    disregardNMI = false;
 }
 
 void NESDL_PPU::Update(uint32_t ppuCycles)
@@ -70,6 +98,11 @@ void NESDL_PPU::HandleProcessVisibleScanline()
 {
     if (currentScanline == 0 && currentScanlineCycle == 0)
     {
+        if (currentFrame > 0)
+        {
+            frameFinished = true;
+        }
+        
         // Clear frameDataSprite table for next frame
         memset(frameDataSprite, 0x3F, sizeof(frameDataSprite));
         
@@ -929,6 +962,12 @@ void NESDL_PPU::WriteToVRAM(uint16_t addr, uint8_t data)
 void NESDL_PPU::WriteCHRROM(uint8_t* addr)
 {
     memcpy(chrData, addr, sizeof(chrData));
+}
+
+void NESDL_PPU::ClearROMData()
+{
+    memset(chrData, 0x00, sizeof(chrData));
+//    memset(oam, 0x00, sizeof(oam));
 }
 
 void NESDL_PPU::SetMirroringMode(bool vertical)

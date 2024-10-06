@@ -133,3 +133,9 @@ void NESDL_RAM::WriteROMData(uint8_t* addr, uint8_t bankCount)
         WriteBytes(0xC000, addr, bankCount * 0x4000);
     }
 }
+
+void NESDL_RAM::ClearROMData()
+{
+    // Clears the entire end of RAM from 0x4020 to 0xFFFF
+    memset(ram + 0x4020, 0x00, 0xBFE0);
+}

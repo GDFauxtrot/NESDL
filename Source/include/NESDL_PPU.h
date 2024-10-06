@@ -89,6 +89,7 @@ class NESDL_PPU
 {
 public:
 	void Init(NESDL_Core* c);
+    void Reset(bool hardReset);
 	void Update(uint32_t ppuCycles);
     bool IsPPUReady();
     void RunNextCycle();
@@ -99,6 +100,7 @@ public:
     uint8_t ReadFromVRAM(uint16_t addr);
     void WriteToVRAM(uint16_t addr, uint8_t data);
     void WriteCHRROM(uint8_t* addr);
+    void ClearROMData();
     void SetMirroringMode(bool vertical);
     void FetchAndStoreTile(uint8_t pixelInFetchCycle);
     uint16_t WeavePatternBits(uint8_t low, uint8_t high, bool flip);
@@ -115,6 +117,7 @@ public:
     uint16_t currentScanline;
     uint16_t currentScanlineCycle;
     bool frameDataReady;
+    bool frameFinished;
 private:
     bool ntMirrorVertical;
     NESDL_Core* core;

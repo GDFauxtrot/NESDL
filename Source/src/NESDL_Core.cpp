@@ -1,9 +1,13 @@
 #include "NESDL.h"
 #include <memory>
 #include <fstream>
+#include "../nativefiledialog/include/nfd.h"
 
-void NESDL_Core::Init()
+void NESDL_Core::Init(NESDL_SDL* sdl)
 {
+    // Hold onto the program's SDL context
+    sdlCtx = sdl;
+    
 	// Initialize the system - CPU, PPU, RAM and APU
 	cpu = new NESDL_CPU();
 	ppu = new NESDL_PPU();
@@ -19,8 +23,6 @@ void NESDL_Core::Init()
     
     // Connect player 1 controller from the start
     input->SetControllerConnected(true, false);
-
-	timeSinceStartup = 0;
 }
 
 void NESDL_Core::Update(double deltaTime)
@@ -31,6 +33,19 @@ void NESDL_Core::Update(double deltaTime)
     uint64_t ppuTiming2 = (NESDL_PPU_CLOCK / 1000) * timeSinceStartup;
     uint32_t ppuCycles = (uint32_t)(ppuTiming2 - ppuTiming1);
     
+    // Force 0 cycles if we're paused, or just 1 if we want to step the PPU.
+    // CPU stepping gets a bit more involved
+    bool stepped = false;
+    if (paused && !stepCPU && !stepFrame)
+    {
+        ppuCycles = 0;
+    }
+    if (stepPPU)
+    {
+        stepPPU = false;
+        ppuCycles = 1;
+        stepped = true;
+    }
     for (uint32_t i = 0; i < ppuCycles; ++i)
     {
         // Send current timeSinceStartup to CPU and PPU to handle their own cycle updates
@@ -42,18 +57,32 @@ void NESDL_Core::Update(double deltaTime)
         if (ppu->frameDataReady)
         {
             ppu->frameDataReady = false;
-            sdlCtx->UpdateScreen(ppu);
+            sdlCtx->UpdateScreenTexture();
         }
+        // We ignore the paused flag if we're CPU stepping,
+        // UNTIL the next instruction is ready.
+        if (stepCPU && cpu->nextInstructionReady)
+        {
+            stepCPU = false;
+            stepped = true;
+            break;
+        }
+        // Same goes for frame stepping
+        if (stepFrame && ppu->frameFinished)
+        {
+            ppu->frameFinished = false;
+            stepFrame = false;
+            stepped = true;
+            break;
+        }
+    }
+    if (stepped)
+    {
+        sdlCtx->UpdateScreen(0);
     }
 }
 
-void NESDL_Core::StartSystem(NESDL_SDL* sdl)
-{
-    cpu->Start();
-    sdlCtx = sdl;
-}
-
-void NESDL_Core::LoadRom(const char* path)
+void NESDL_Core::LoadROM(const char* path)
 {
 	ifstream file;
 	file.open(path, ifstream::in | ifstream::binary);
@@ -66,7 +95,6 @@ void NESDL_Core::LoadRom(const char* path)
 	uint8_t romBankCount = header.banks;
 	uint8_t vromBankCount = header.vbanks;
 
-    
 	// TODO read header for any trainer or mapping data! Then skip ahead if needed
 	// Check for trainer flag in bit 2, skip it if detected
 	if ((header.ctrl1 & 0x4) == 0x4) 
@@ -94,9 +122,100 @@ void NESDL_Core::LoadRom(const char* path)
     }
 	
 	file.close();
+    
+    romLoaded = true;
 }
 
 void NESDL_Core::HandleEvent(SDL_EventType eventType, SDL_KeyCode eventKeyCode)
 {
     input->RegisterKey(eventKeyCode, eventType == SDL_KEYDOWN);
+}
+
+bool NESDL_Core::IsROMLoaded()
+{
+    return romLoaded;
+}
+
+void NESDL_Core::Action_OpenROM()
+{
+    string romFilePath = "Super Mario Bros.nes";
+    
+    // Check if file exists
+    // TODO - is fopen/fclose a good way to do this?
+    bool fileExists = false;
+    FILE* file = fopen(romFilePath.c_str(), "r");
+    if (file)
+    {
+        fileExists = true;
+    }
+    fclose(file);
+    
+    if (fileExists)
+    {
+        LoadROM(romFilePath.c_str());
+        Action_ResetHard();
+    }
+}
+void NESDL_Core::Action_CloseROM()
+{
+    // Leave all states intact but "unplug" all cartridge data
+    ram->ClearROMData();
+    ppu->ClearROMData();
+    prgROM.reset();
+    chrROM.reset();
+    romLoaded = false;
+}
+void NESDL_Core::Action_ResetSoft()
+{
+    cpu->Reset(false);
+    ppu->Reset(false);
+    sdlCtx->UpdateScreenTexture();
+}
+void NESDL_Core::Action_ResetHard()
+{
+    timeSinceStartup = 0;
+    cpu->Reset(true);
+    ppu->Reset(true);
+    sdlCtx->UpdateScreenTexture();
+}
+void NESDL_Core::Action_ViewFrameInfo()
+{
+    sdlCtx->ToggleFrameInfo();
+}
+void NESDL_Core::Action_DebugRun()
+{
+    paused = false;
+}
+void NESDL_Core::Action_DebugPause()
+{
+    paused = true;
+}
+void NESDL_Core::Action_DebugStepFrame()
+{
+    paused = true;
+    stepFrame = true;
+    stepCPU = false;
+    stepPPU = false;
+}
+void NESDL_Core::Action_DebugStepCPU()
+{
+    paused = true;
+    stepFrame = false;
+    stepCPU = true;
+    stepPPU = false;
+}
+void NESDL_Core::Action_DebugStepPPU()
+{
+    paused = true;
+    stepFrame = false;
+    stepCPU = false;
+    stepPPU = true;
+}
+void NESDL_Core::Action_DebugShowCPU()
+{
+    sdlCtx->ToggleShowCPU();
+}
+void NESDL_Core::Action_DebugShowPPU()
+{
+    sdlCtx->ToggleShowPPU();
 }

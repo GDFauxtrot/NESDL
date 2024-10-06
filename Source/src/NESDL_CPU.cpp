@@ -2,16 +2,37 @@
 
 void NESDL_CPU::Init(NESDL_Core* c)
 {
-	elapsedCycles = 0;
     core = c;
     addrModeResult = new AddressModeResult();
-    ppuCycleCounter = 0;
 }
 
-void NESDL_CPU::Start()
+void NESDL_CPU::Reset(bool hardReset)
 {
+    if (hardReset)
+    {
+        elapsedCycles = 0;
+        
+        registers.a = 0;
+        registers.x = 0;
+        registers.y = 0;
+        registers.sp = 0x00;
+    }
+    registers.pc = 0xFFFC;
+    registers.sp -= 3;
+    
+    // Ready P register in a unique way
+    if (hardReset)
+    {
+        registers.p = PSTATUS_INTERRUPTDISABLE | PSTATUS_UNDEFINED;
+    }
+    else
+    {
+        registers.p = registers.p & PSTATUS_INTERRUPTDISABLE;
+    }
+    
+    // With the CPU state reset, prime the CPU for program execution
     // CPU warms up for 7 cycles and fetches the start address to PC
-    InitializeCPURegisters();
+    ppuCycleCounter = 0;
     registers.pc = core->ram->ReadWord(registers.pc);
     elapsedCycles += 7;
 }
@@ -64,18 +85,9 @@ void NESDL_CPU::Update(uint32_t ppuCycles)
         }
     }
     ppuCycleCounter += ppuCycles;
-}
-
-void NESDL_CPU::InitializeCPURegisters()
-{
-    // Initialize registers with values measured from real-world hardware,
-    // assuming a hard reset.
-    registers.a = 0;
-    registers.x = 0;
-    registers.y = 0;
-    registers.pc = 0xFFFC;
-    registers.sp = 0xFD;
-    registers.p = PSTATUS_INTERRUPTDISABLE | PSTATUS_UNDEFINED;
+    
+    // Used for step debugging
+    nextInstructionReady = (ppuCycleCounter >= 0);
 }
 
 uint8_t NESDL_CPU::GetCyclesForNextInstruction()

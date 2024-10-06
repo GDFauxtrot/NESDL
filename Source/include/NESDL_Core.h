@@ -16,12 +16,26 @@ struct FileHeader_INES
 class NESDL_Core
 {
 public:
-	void Init();
-    void StartSystem(NESDL_SDL* sdl);
+	void Init(NESDL_SDL* sdl);
 	void Update(double deltaTime);
-	void LoadRom(const char* path);
+	void LoadROM(const char* path);
     void HandleEvent(SDL_EventType eventType, SDL_KeyCode eventKeyCode);
+    bool IsROMLoaded();
 
+    // Menu bar actions (called from OS-specific areas)
+    void Action_OpenROM();
+    void Action_CloseROM();
+    void Action_ResetSoft();
+    void Action_ResetHard();
+    void Action_ViewFrameInfo();
+    void Action_DebugRun();
+    void Action_DebugPause();
+    void Action_DebugStepFrame();
+    void Action_DebugStepCPU();
+    void Action_DebugStepPPU();
+    void Action_DebugShowCPU();
+    void Action_DebugShowPPU();
+    
 	NESDL_CPU* cpu;
 	NESDL_PPU* ppu;
 	NESDL_RAM* ram;
@@ -29,8 +43,15 @@ public:
     NESDL_Input* input;
 private:
     NESDL_SDL* sdlCtx;
-	double timeSinceStartup;
+    
     // Populated on ROM load
     shared_ptr<vector<uint8_t>> prgROM;
     shared_ptr<vector<uint8_t>> chrROM;
+    
+    double timeSinceStartup;
+    bool romLoaded;
+    bool paused;
+    bool stepFrame;
+    bool stepCPU;
+    bool stepPPU;
 };

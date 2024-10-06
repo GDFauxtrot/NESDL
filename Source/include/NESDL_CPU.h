@@ -37,10 +37,17 @@ class NESDL_CPU
 {
 public:
 	void Init(NESDL_Core* c);
-    void Start();
+    void Reset(bool hardReset);
 	void Update(uint32_t ppuCycles);
-    void InitializeCPURegisters();
-	void RunNextInstruction();
+    
+    uint64_t elapsedCycles;
+    CPURegisters registers;
+    bool nmi;
+    bool delayNMI;
+    bool dma;
+    bool nextInstructionReady;
+private:
+    void RunNextInstruction();
     void SetPSFlag(uint8_t flag, bool on);
     void GetByteForAddressMode(AddrMode mode, AddressModeResult* result);
     void AdvanceCyclesForAddressMode(uint8_t opcode, AddrMode mode, bool pageCross, bool extraCycles, bool relSuccess);
@@ -105,14 +112,8 @@ public:
     void OP_TXS(uint8_t opcode, AddrMode mode);
     void OP_TYA(uint8_t opcode, AddrMode mode);
     void OP_KIL();
-    void NMI();
+    void NMI(); // NMI interrupt (special case)
     
-    uint64_t elapsedCycles;
-    CPURegisters registers;
-    bool nmi;
-    bool delayNMI;
-    bool dma;
-private:
     bool delayedDMA;
 	NESDL_Core* core;
     AddressModeResult* addrModeResult;
