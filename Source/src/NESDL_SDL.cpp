@@ -125,6 +125,13 @@ void NESDL_SDL::UpdateScreen(double fps)
         }
     }
     
+    // Scale NESDL_Text size to window
+    int winX;
+    int winY;
+    SDL_GetWindowSize(window, &winX, &winY);
+    double winMulX = (double)winX / NESDL_SCREEN_WIDTH;
+    double winMulY = (double)winY / NESDL_SCREEN_HEIGHT;
+    
     SDL_RenderClear(renderer);
     SDL_RenderCopy(renderer, texture, NULL, NULL);
     // Iterate through NESDL_Text instances and draw them
@@ -135,16 +142,24 @@ void NESDL_SDL::UpdateScreen(double fps)
             if (value->background)
             {
                 SDL_Color bgColor = value->backgroundFrameColor;
-                int pad = value->backgroundPadding;
                 SDL_SetRenderDrawColor(renderer, bgColor.r, bgColor.g, bgColor.b, bgColor.a);
-                SDL_Rect backgroundRect = { value->x-pad, value->y-pad, value->width+pad*2, value->height+pad*2 };
-                SDL_RenderFillRect(renderer, &backgroundRect);
-                SDL_RenderDrawRect(renderer, &backgroundRect);
+                int pad = value->backgroundPadding;
+                int x = (value->x-pad) * winMulX;
+                int y = (value->y-pad) * winMulY;
+                int w = (value->width+pad*2) * winMulX;
+                int h = (value->height+pad*2) * winMulY;
+                SDL_Rect backgroundRect = { x, y, w, h };
+                SDL_RenderFillRect(renderer, &backgroundRect); // Background fill render
+                SDL_RenderDrawRect(renderer, &backgroundRect); // Background border render
             }
             if (value->texture != nullptr)
             {
-                SDL_Rect renderRect = { value->x, value->y, value->width, value->height };
-                SDL_RenderCopy(renderer, value->texture, nullptr, &renderRect);
+                int x = value->x * winMulX;
+                int y = value->y * winMulY;
+                int w = value->width * winMulX;
+                int h = value->height * winMulY;
+                SDL_Rect renderRect = { x, y, w, h };
+                SDL_RenderCopy(renderer, value->texture, nullptr, &renderRect); // Text render
             }
         }
     }

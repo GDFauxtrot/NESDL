@@ -65,7 +65,9 @@ void CreateMenuItemAndAddToMenu(NSMenu* menu, NSObject* ctx, NSString* name, SEL
     [[NSApp mainMenu] insertItem:menuItem atIndex:1];
     
     viewMenu = [[NSMenu alloc] initWithTitle:@"View"];
-    CreateMenuItemAndAddToMenu(viewMenu, self, @"Frame Info", @selector(viewFrameInfo:), @"");
+    CreateMenuItemAndAddToMenu(viewMenu, self, @"Show Frame Info", @selector(viewFrameInfo:), @"");
+    CreateMenuItemAndAddToMenu(viewMenu, self, @"Show CPU Info", @selector(debugShowCPU:), @"");
+    CreateMenuItemAndAddToMenu(viewMenu, self, @"Show PPU Info", @selector(debugShowPPU:), @"");
     menuItem = [[NSMenuItem alloc] init];
     [menuItem setSubmenu:viewMenu];
     [[NSApp mainMenu] insertItem:menuItem atIndex:2];
@@ -76,8 +78,6 @@ void CreateMenuItemAndAddToMenu(NSMenu* menu, NSObject* ctx, NSString* name, SEL
     CreateMenuItemAndAddToMenu(debugMenu, self, @"Step (Frame)", @selector(debugStepFrame:), @"1");
     CreateMenuItemAndAddToMenu(debugMenu, self, @"Step (CPU)", @selector(debugStepCPU:), @"2");
     CreateMenuItemAndAddToMenu(debugMenu, self, @"Step (PPU)", @selector(debugStepPPU:), @"3");
-    CreateMenuItemAndAddToMenu(debugMenu, self, @"Show CPU Info", @selector(debugShowCPU:), @"");
-    CreateMenuItemAndAddToMenu(debugMenu, self, @"Show PPU Info", @selector(debugShowPPU:), @"");
     menuItem = [[NSMenuItem alloc] init];
     [menuItem setSubmenu:debugMenu];
     [[NSApp mainMenu] insertItem:menuItem atIndex:3];

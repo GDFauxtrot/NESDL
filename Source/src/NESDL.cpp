@@ -49,16 +49,8 @@ int main(int argc, char* args[])
     sdlCtx->SetCore(core);
 #endif
     
-    // Get ROM file (we hard coding this for now! Let's build a menu bar to load stuff later)
-    
-    string romFile = "nestest.nes";
-//    string romFile = "Super Mario Bros.nes";
-    
-    printf("%s", getcwd(NULL, 0));
+//    printf("%s", getcwd(NULL, 0));
 
-    // Load ROM into core
-//    core.LoadRom(romFile.c_str());
-    
     // SLEEP for a second while we boot up
     SDL_GetPerformanceCounter();
 
@@ -82,13 +74,7 @@ int main(int argc, char* args[])
                 isRunning = false;
             }
         }
-//        if (isFirstFrame)
-//        {
-//            isFirstFrame = false;
-//            currentPerf = SDL_GetPerformanceCounter();
-//            lastPerf = currentPerf;
-//        }
-
+        
         // Advance the core by the amount of time taken this loop
         // (NOTE: Don't simulate a delay longer than 50ms!
         // We can't detect when SDL stalls due to menu bar interaction or debugging, and

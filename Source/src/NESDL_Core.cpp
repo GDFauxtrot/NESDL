@@ -1,7 +1,7 @@
 #include "NESDL.h"
 #include <memory>
 #include <fstream>
-#include "../nativefiledialog/include/nfd.h"
+#include "nfd.h"
 
 void NESDL_Core::Init(NESDL_SDL* sdl)
 {
@@ -87,10 +87,17 @@ void NESDL_Core::LoadROM(const char* path)
 	ifstream file;
 	file.open(path, ifstream::in | ifstream::binary);
 
-	// Read header
+	// Attempt to read file as a ROM with a valid 16-byte header
+    // (TODO what if the file is < 16 bytes, or empty? This would surely fail)
 	FileHeader_INES header;
 	file.read((char*)&header, sizeof(header));
 
+    // If header doesn't say "NES" with an EOF char, surely this isn't a ROM file
+    if (header.id != 0x1A53454E)
+    {
+        return;
+    }
+    
 	// Get the program bank count and VROM bank count. We'll be reading this data soon
 	uint8_t romBankCount = header.banks;
 	uint8_t vromBankCount = header.vbanks;
@@ -138,23 +145,15 @@ bool NESDL_Core::IsROMLoaded()
 
 void NESDL_Core::Action_OpenROM()
 {
-    string romFilePath = "Super Mario Bros.nes";
-    
-    // Check if file exists
-    // TODO - is fopen/fclose a good way to do this?
-    bool fileExists = false;
-    FILE* file = fopen(romFilePath.c_str(), "r");
-    if (file)
+    nfdchar_t *romFilePath = NULL;
+    nfdresult_t result = NFD_OpenDialog("nes", NULL, &romFilePath);
+    // Don't continue if we didn't successfully choose a file, or (somehow) it's empty
+    if (result != NFD_OKAY || strcmp(romFilePath, "") == 0)
     {
-        fileExists = true;
+        return;
     }
-    fclose(file);
-    
-    if (fileExists)
-    {
-        LoadROM(romFilePath.c_str());
-        Action_ResetHard();
-    }
+    LoadROM(romFilePath);
+    Action_ResetHard();
 }
 void NESDL_Core::Action_CloseROM()
 {
