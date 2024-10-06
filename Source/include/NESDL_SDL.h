@@ -4,7 +4,7 @@ class NESDL_Text
 {
 public:
     NESDL_Text(const char* text, SDL_Texture* texture, int x, int y)
-    :text(text), texture(texture), textColor({0, 0, 0}), x(x), y(y), width(0), height(0), background(false), backgroundFrameColor({0, 0, 0, 128}), backgroundPadding(2), wrapLength(9999) {}
+    :text(text), texture(texture), textColor({0, 0, 0}), x(x), y(y), width(0), height(0), background(false), backgroundFrameColor({24, 0, 80, 128}), backgroundPadding(2), wrapLength(9999) {}
     const char* text;
     SDL_Texture* texture;
     SDL_Color textColor;
