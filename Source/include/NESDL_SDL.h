@@ -28,6 +28,7 @@ public:
     void UpdateScreenTexture();
     
     void ToggleFrameInfo();
+    void Resize(int resize);
     void ToggleShowCPU();
     void ToggleShowPPU();
     
@@ -52,6 +53,7 @@ private:
 	SDL_Window* window;
 	SDL_Renderer* renderer;
     SDL_Texture* texture;
+    SDL_Texture* scanlineTexture;
     bool showFrameInfo;
     bool showCPU;
     bool showPPU;

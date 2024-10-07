@@ -181,6 +181,10 @@ void NESDL_Core::Action_ViewFrameInfo()
 {
     sdlCtx->ToggleFrameInfo();
 }
+void NESDL_Core::Action_ViewResize(int resize)
+{
+    sdlCtx->Resize(resize);
+}
 void NESDL_Core::Action_DebugRun()
 {
     paused = false;

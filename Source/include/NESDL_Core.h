@@ -28,6 +28,7 @@ public:
     void Action_ResetSoft();
     void Action_ResetHard();
     void Action_ViewFrameInfo();
+    void Action_ViewResize(int resize);
     void Action_DebugRun();
     void Action_DebugPause();
     void Action_DebugStepFrame();
@@ -41,6 +42,8 @@ public:
 	NESDL_RAM* ram;
 	NESDL_APU* apu;
     NESDL_Input* input;
+    
+    bool romLoaded;
 private:
     NESDL_SDL* sdlCtx;
     
@@ -49,7 +52,6 @@ private:
     shared_ptr<vector<uint8_t>> chrROM;
     
     double timeSinceStartup;
-    bool romLoaded;
     bool paused;
     bool stepFrame;
     bool stepCPU;

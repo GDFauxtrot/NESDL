@@ -60,6 +60,19 @@ void NESDL_SDL::SDLInit()
             // Clear screen to black and present
             SDL_RenderClear(renderer);
             SDL_RenderPresent(renderer);
+            
+            // Get a pre-made "scanline" texture ready to go
+            scanlineTexture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_TARGET, NESDL_SCREEN_WIDTH, NESDL_SCREEN_HEIGHT);
+            SDL_SetTextureBlendMode(scanlineTexture, SDL_BLENDMODE_BLEND);
+            SDL_SetRenderDrawColor(renderer, 16, 0, 48, 64);
+            SDL_SetRenderTarget(renderer, scanlineTexture);
+            
+            for (int y = 0; y < NESDL_SCREEN_HEIGHT; y += 4)
+            {
+                SDL_Rect r = { 0, y, NESDL_SCREEN_WIDTH, 2 };
+                SDL_RenderFillRect(renderer, &r);
+            }
+            SDL_SetRenderTarget(renderer, nullptr);
         }
     }
     
@@ -125,6 +138,22 @@ void NESDL_SDL::UpdateScreen(double fps)
         }
     }
     
+    // Draw game's frame data to screen
+    SDL_RenderClear(renderer);
+    SDL_RenderCopy(renderer, texture, NULL, NULL);
+    
+    // Draw an overlay over the screen when a game isn't inserted
+    if (core->romLoaded == false)
+    {
+        int w;
+        int h;
+        SDL_GetWindowSize(window, &w, &h);
+        SDL_SetRenderDrawColor(renderer, 48, 0, 144, 64);
+        SDL_Rect rect = { 0, 0, w, h };
+        SDL_RenderFillRect(renderer, &rect);
+        SDL_RenderCopy(renderer, scanlineTexture, nullptr, nullptr);
+    }
+    
     // Scale NESDL_Text size to window
     int winX;
     int winY;
@@ -132,8 +161,6 @@ void NESDL_SDL::UpdateScreen(double fps)
     double winMulX = (double)winX / NESDL_SCREEN_WIDTH;
     double winMulY = (double)winY / NESDL_SCREEN_HEIGHT;
     
-    SDL_RenderClear(renderer);
-    SDL_RenderCopy(renderer, texture, NULL, NULL);
     // Iterate through NESDL_Text instances and draw them
     for(const auto& textKV: screenText) {
         NESDL_Text* value = textKV.second;
@@ -163,6 +190,7 @@ void NESDL_SDL::UpdateScreen(double fps)
             }
         }
     }
+    
     SDL_RenderPresent(renderer);
 }
 
@@ -187,6 +215,11 @@ void NESDL_SDL::ToggleFrameInfo()
     {
         RemoveScreenText("frameinfo");
     }
+}
+
+void NESDL_SDL::Resize(int resize)
+{
+    SDL_SetWindowSize(window, NESDL_SCREEN_WIDTH * resize, NESDL_SCREEN_HEIGHT * resize);
 }
 
 void NESDL_SDL::ToggleShowCPU()
