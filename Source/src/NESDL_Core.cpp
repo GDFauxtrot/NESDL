@@ -92,7 +92,7 @@ void NESDL_Core::LoadROM(const char* path)
 	FileHeader_INES header;
 	file.read((char*)&header, sizeof(header));
 
-    // If header doesn't say "NES" with an EOF char, surely this isn't a ROM file
+    // If header doesn't say "NES" with an EOF char, surely this isn't a valid ROM file
     if (header.id != 0x1A53454E)
     {
         return;
@@ -109,15 +109,26 @@ void NESDL_Core::LoadROM(const char* path)
 		file.seekg(512, ios_base::cur);
 	}
     
-    // Relay mirroring info to PPU
-    ppu->SetMirroringMode(header.ctrl1 & 0x1);
+    // Set up mapper
+    uint8_t mapperNum = ((header.ctrl1 & INES_MAPPER_LOW) >> 4) | (header.ctrl2 & INES_MAPPER_HI);
+    switch (mapperNum)
+    {
+        case 0:
+            mapper = new NESDL_Mapper_0();
+            break;
+        default:
+            printf("ROM uses an unsupported mapper! #%d\n", mapperNum);
+            file.close();
+            return;
+    }
 
 	// Read off the 16KB allocated PRG-ROM banks
+    shared_ptr<vector<uint8_t>> prgROM;
+    shared_ptr<vector<uint8_t>> chrROM;
     if (romBankCount > 0)
     {
         prgROM = make_shared<vector<uint8_t>>(romBankCount * 0x4000);
         file.read((char*)prgROM->data(), romBankCount * 0x4000);
-        ram->WriteROMData(prgROM->data(), romBankCount); // TODO abstract this to a mapper! Assuming NROM
     }
 
 	// Read off the 8KB allocated CHR-ROM banks
@@ -125,11 +136,19 @@ void NESDL_Core::LoadROM(const char* path)
     {
         chrROM = make_shared<vector<uint8_t>>(vromBankCount * 0x2000);
         file.read((char*)chrROM->data(), vromBankCount * 0x2000);
-        ppu->WriteCHRROM(chrROM->data()); // TODO abstract this to a mapper! Assuming NROM (no bankswitches, 1 bank only)
     }
-	
-	file.close();
     
+    // Done with file -- we can close it now
+    file.close();
+    
+    // Initialize mapper with all of its pertinent data
+    mapper->InitROMData(prgROM->data(), romBankCount, chrROM->data(), vromBankCount);
+    mapper->SetMirroringData(header.ctrl1 & INES_NTMIRROR);
+    
+    // Let components know we exist
+    ram->SetMapper(mapper);
+    ppu->SetMapper(mapper);
+	
     romLoaded = true;
 }
 
@@ -158,10 +177,9 @@ void NESDL_Core::Action_OpenROM()
 void NESDL_Core::Action_CloseROM()
 {
     // Leave all states intact but "unplug" all cartridge data
-    ram->ClearROMData();
-    ppu->ClearROMData();
-    prgROM.reset();
-    chrROM.reset();
+    free(mapper);
+    ram->SetMapper(nullptr);
+    ppu->SetMapper(nullptr);
     romLoaded = false;
 }
 void NESDL_Core::Action_ResetSoft()

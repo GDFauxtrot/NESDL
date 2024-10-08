@@ -13,6 +13,17 @@ struct FileHeader_INES
 	uint8_t unused[5]; // Unused (future) flags
 };
 
+#define INES_NTMIRROR   0x01
+#define INES_SAVEDATA   0x02
+#define INES_TRAINER    0x04
+#define INES_NTLAYOUT   0x08
+#define INES_MAPPER_LOW 0xF0
+
+#define INES_VSSYSTEM   0x01
+#define INES_PLAYCHOICE 0x02
+#define INES_NES20      0x0C
+#define INES_MAPPER_HI  0xF0
+
 class NESDL_Core
 {
 public:
@@ -46,10 +57,7 @@ public:
     bool romLoaded;
 private:
     NESDL_SDL* sdlCtx;
-    
-    // Populated on ROM load
-    shared_ptr<vector<uint8_t>> prgROM;
-    shared_ptr<vector<uint8_t>> chrROM;
+    NESDL_Mapper* mapper;
     
     double timeSinceStartup;
     bool paused;

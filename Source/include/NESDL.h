@@ -13,6 +13,7 @@
 
 #include "NESDL_Constants.h"
 #include "NESDL_Input.h"
+#include "NESDL_Mapper.h"
 #include "NESDL_CPU.h"
 #include "NESDL_PPU.h"
 #include "NESDL_RAM.h"

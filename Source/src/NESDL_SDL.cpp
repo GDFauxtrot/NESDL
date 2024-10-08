@@ -66,7 +66,6 @@ void NESDL_SDL::SDLInit()
             SDL_SetTextureBlendMode(scanlineTexture, SDL_BLENDMODE_BLEND);
             SDL_SetRenderDrawColor(renderer, 16, 0, 48, 64);
             SDL_SetRenderTarget(renderer, scanlineTexture);
-            
             for (int y = 0; y < NESDL_SCREEN_HEIGHT; y += 4)
             {
                 SDL_Rect r = { 0, y, NESDL_SCREEN_WIDTH, 2 };

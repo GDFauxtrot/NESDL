@@ -91,6 +91,7 @@ public:
 	void Init(NESDL_Core* c);
     void Reset(bool hardReset);
 	void Update(uint32_t ppuCycles);
+    void SetMapper(NESDL_Mapper* m);
     bool IsPPUReady();
     void RunNextCycle();
     void HandleProcessVisibleScanline();
@@ -99,9 +100,7 @@ public:
     uint8_t ReadFromRegister(uint16_t registerAddr);
     uint8_t ReadFromVRAM(uint16_t addr);
     void WriteToVRAM(uint16_t addr, uint8_t data);
-    void WriteCHRROM(uint8_t* addr);
-    void ClearROMData();
-    void SetMirroringMode(bool vertical);
+    uint16_t GetMirroredAddress(uint16_t addr);
     void FetchAndStoreTile(uint8_t pixelInFetchCycle);
     uint16_t WeavePatternBits(uint8_t low, uint8_t high, bool flip);
     uint32_t GetPalette(uint8_t index, bool spriteLayer);
@@ -119,12 +118,11 @@ public:
     bool frameDataReady;
     bool frameFinished;
 private:
-    bool ntMirrorVertical;
     NESDL_Core* core;
+    NESDL_Mapper* mapper;
     uint64_t elapsedCycles;
     int32_t currentDrawX;
-    uint8_t chrData[0x2000]; // 8KB (at a time) of CHR-ROM/RAM memory
-    uint8_t vram[0x1000];  // 4kb VRAM for the PPU (physically 2kb on stock but supports 4 nametables)
+    uint8_t vram[0x1000];  // 4kb VRAM for the PPU (physically 2kb but supports 4 nametables)
     uint8_t paletteData[0x20]; // Bit of space at the end of VRAM address space for palette data
     PPUTileFetch tileFetch;
     uint8_t ppuDataReadBuffer; // Special internal buffer for PPUDATA reads

@@ -8,12 +8,12 @@ public:
 	uint8_t ReadByte(uint16_t addr);
     uint16_t ReadWord(uint16_t addr);
 	void WriteByte(uint16_t addr, uint8_t data);
-	void WriteBytes(uint16_t addr, uint8_t* data, size_t size);
-	void WriteROMData(uint8_t* data, uint8_t bankCount);
-    void ClearROMData();
+    void SetMapper(NESDL_Mapper* m);
+    
     bool oops;
     bool ignoreChanges;
 private:
     NESDL_Core* core;
-	uint8_t ram[0x10000]; // 64KB address space
+    NESDL_Mapper* mapper;
+	uint8_t ram[0x800]; // 2KB internal RAM (the rest of address space is mirrored/rerouted)
 };

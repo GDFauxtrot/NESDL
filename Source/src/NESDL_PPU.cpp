@@ -52,6 +52,11 @@ void NESDL_PPU::Update(uint32_t ppuCycles)
     }
 }
 
+void NESDL_PPU::SetMapper(NESDL_Mapper* m)
+{
+    mapper = m;
+}
+
 bool NESDL_PPU::IsPPUReady()
 {
     return elapsedCycles >= NESDL_PPU_READY * 3;
@@ -712,7 +717,7 @@ void NESDL_PPU::WriteToRegister(uint16_t registerAddr, uint8_t data)
             // "Probably best to completely ignore writes during rendering" - NESDEV
 //            if (currentScanline >= 240)
             {
-                vram[registers.oamAddr++] = data;
+                oam[registers.oamAddr++] = data;
             }
             break;
         case PPU_PPUSCROLL:
@@ -863,11 +868,6 @@ uint8_t NESDL_PPU::ReadFromRegister(uint16_t registerAddr)
 
 uint8_t NESDL_PPU::ReadFromVRAM(uint16_t addr)
 {
-    // Accessing CHR ROM/RAM data from cartridge
-    if (addr < 0x2000)
-    {
-        return chrData[addr];
-    }
     // Mirrored address space(s) 0x3000-0x3EFF -> 0x2000-0x2EFF
     if (addr >= 0x3000 && addr < 0x3F00)
     {
@@ -878,26 +878,14 @@ uint8_t NESDL_PPU::ReadFromVRAM(uint16_t addr)
         addr = 0x3F00 | (addr % 0x20);
     }
     
-    if (addr >= 0x2000 && addr < 0x3000)
+    // Accessing CHR ROM/RAM data from cartridge
+    if (addr < 0x2000)
     {
-        // Nametable mirroring: [0, 1]
-        //                      [2, 3]
-        if (ntMirrorVertical)
-        {
-            // Vertical mirror - NT 0 maps to 2, NT 1 maps to 3
-            if (addr >= 0x2800)
-            {
-                addr = 0x2000 | (addr % 0x800);
-            }
-        }
-        else
-        {
-            // Horizontal mirror - NT 0 maps to 1, NT 2 maps to 3
-            if (addr >= 0x2C00 || (addr >= 0x2400 && addr < 0x2800))
-            {
-                addr -= 0x400;
-            }
-        }
+        return mapper->ReadByte(addr);
+    }
+    else if (addr >= 0x2000 && addr < 0x3000)
+    {
+        addr = GetMirroredAddress(addr);
         return vram[addr - 0x2000];
     }
     else if (addr >= 0x3F00)
@@ -909,13 +897,7 @@ uint8_t NESDL_PPU::ReadFromVRAM(uint16_t addr)
 
 void NESDL_PPU::WriteToVRAM(uint16_t addr, uint8_t data)
 {
-    if (addr < 0x2000)
-    {
-        // Read-only ROM data - ignore (for now - TODO implement CHR-RAM)
-//        chrData[addr] = data;
-        return;
-    }
-    // Mirrored address space(s)
+    // Mirror address space(s)
     if (addr >= 0x3000 && addr < 0x3F00)
     {
         addr -= 0x1000;
@@ -925,26 +907,14 @@ void NESDL_PPU::WriteToVRAM(uint16_t addr, uint8_t data)
         addr = 0x3F00 | (addr % 0x20);
     }
     
-    if (addr >= 0x2000 && addr < 0x3000)
+    if (addr < 0x2000)
     {
-        // Nametable mirroring: [0, 1]
-        //                      [2, 3]
-        if (ntMirrorVertical)
-        {
-            // Vertical mirror - NT 0 maps to 2, NT 1 maps to 3
-            if (addr >= 0x2800)
-            {
-                addr = 0x2000 | (addr % 0x800);
-            }
-        }
-        else
-        {
-            // Horizontal mirror - NT 0 maps to 1, NT 2 maps to 3
-            if (addr >= 0x2C00 || (addr >= 0x2400 && addr < 0x2800))
-            {
-                addr -= 0x400;
-            }
-        }
+        mapper->WriteByte(addr, data);
+        return;
+    }
+    else if (addr >= 0x2000 && addr < 0x3000)
+    {
+        addr = GetMirroredAddress(addr);
         vram[addr - 0x2000] = data;
     }
     else if (addr >= 0x3F00)
@@ -959,20 +929,36 @@ void NESDL_PPU::WriteToVRAM(uint16_t addr, uint8_t data)
     }
 }
 
-void NESDL_PPU::WriteCHRROM(uint8_t* addr)
+uint16_t NESDL_PPU::GetMirroredAddress(uint16_t addr)
 {
-    memcpy(chrData, addr, sizeof(chrData));
-}
-
-void NESDL_PPU::ClearROMData()
-{
-    memset(chrData, 0x00, sizeof(chrData));
-//    memset(oam, 0x00, sizeof(oam));
-}
-
-void NESDL_PPU::SetMirroringMode(bool vertical)
-{
-    ntMirrorVertical = vertical;
+    // Nametable mirroring: [0, 1]
+    //                      [2, 3]
+    switch (mapper->GetMirroringMode())
+    {
+        case MirroringMode::Horizontal:
+            // Horizontal mirror - NT 0 maps to 1, NT 2 maps to 3
+            if (addr >= 0x2C00 || (addr >= 0x2400 && addr < 0x2800))
+            {
+                addr -= 0x400;
+            }
+            break;
+        case MirroringMode::Vertical:
+            // Vertical mirror - NT 0 maps to 2, NT 1 maps to 3
+            if (addr >= 0x2800)
+            {
+                addr = 0x2000 | (addr % 0x800);
+            }
+            break;
+        case MirroringMode::One_LowerBank:
+        case MirroringMode::One_UpperBank:
+            // Both versions map to NT 0
+            addr = 0x2000 | (addr % 0x400);
+            break;
+        case MirroringMode::Four:
+            // 4-way means NO mirroring!
+            break;
+    }
+    return addr;
 }
 
 uint16_t NESDL_PPU::WeavePatternBits(uint8_t low, uint8_t high, bool flip)
