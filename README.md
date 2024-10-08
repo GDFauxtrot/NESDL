@@ -45,7 +45,7 @@ Currently, controls are hard-bound to the keyboard (mainly for me to use while d
 
 According to [this list](https://github.com/rynorris/nes/issues/31) (source info is currently down), the following mappers make up nearly 90% of the entire NES library, in order of popularity:
 
-- [ ] Mapper 1 (MMC1)
+- [X] Mapper 1 (MMC1)
 - [ ] Mapper 4 (MMC3)
 - [ ] Mapper 2 (UxROM)
 - [x] Mapper 0 (NROM)
