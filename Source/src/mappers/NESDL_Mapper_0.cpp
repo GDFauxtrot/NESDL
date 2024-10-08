@@ -28,7 +28,6 @@ uint8_t NESDL_Mapper_0::ReadByte(uint16_t addr)
         return chrROM[addr];
     }
     
-    // TODO
     // 0x6000-0x7FFF is currently unimplemented (Family BASIC only)
     
     // Mirror down address if we only have one PRG bank

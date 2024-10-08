@@ -933,7 +933,8 @@ uint16_t NESDL_PPU::GetMirroredAddress(uint16_t addr)
 {
     // Nametable mirroring: [0, 1]
     //                      [2, 3]
-    switch (mapper->GetMirroringMode())
+    MirroringMode mode = mapper->GetMirroringMode();
+    switch (mode)
     {
         case MirroringMode::Horizontal:
             // Horizontal mirror - NT 0 maps to 1, NT 2 maps to 3

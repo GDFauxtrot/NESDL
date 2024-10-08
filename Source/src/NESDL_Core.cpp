@@ -114,7 +114,11 @@ void NESDL_Core::LoadROM(const char* path)
     switch (mapperNum)
     {
         case 0:
-            mapper = new NESDL_Mapper_0();
+            mapper = new NESDL_Mapper_0(this);
+            mapper->SetMirroringData(header.ctrl1 & INES_NTMIRROR);
+            break;
+        case 1:
+            mapper = new NESDL_Mapper_1(this);
             break;
         default:
             printf("ROM uses an unsupported mapper! #%d\n", mapperNum);
@@ -143,7 +147,6 @@ void NESDL_Core::LoadROM(const char* path)
     
     // Initialize mapper with all of its pertinent data
     mapper->InitROMData(prgROM->data(), romBankCount, chrROM->data(), vromBankCount);
-    mapper->SetMirroringData(header.ctrl1 & INES_NTMIRROR);
     
     // Let components know we exist
     ram->SetMapper(mapper);
