@@ -127,6 +127,7 @@ private:
     uint8_t vram[0x1000];  // 4kb VRAM for the PPU (physically 2kb but supports 4 nametables)
     uint8_t paletteData[0x20]; // Bit of space at the end of VRAM address space for palette data
     PPUTileFetch tileFetch;
+    PPUTileFetch tileBuffer[2]; // Two tile buffers (rendering takes place 2 tiles later from read)
     uint8_t ppuDataReadBuffer; // Special internal buffer for PPUDATA reads
     uint8_t oam[64 * 4]; // 64 slots (256 bytes) for PPU "Object Attribute Memory"
     uint8_t secondaryOAM[8 * 5]; // 8 slots (32 + 8 bytes) of next scanline's chosen sprites

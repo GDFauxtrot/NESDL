@@ -104,7 +104,9 @@ uint8_t NESDL_CPU::GetCyclesForNextInstruction()
     core->ppu->ignoreChanges = true;
     core->ram->ignoreChanges = true;
     core->input->ignoreChanges = true;
+    core->mapper->ignoreChanges = true;
     RunNextInstruction();
+    core->mapper->ignoreChanges = false;
     core->ppu->ignoreChanges = false;
     core->ram->ignoreChanges = false;
     core->input->ignoreChanges = false;

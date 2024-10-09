@@ -142,7 +142,9 @@ void NESDL_PPU::HandleProcessVisibleScanline()
             {
                 // Grab the tile to be rendered (from tileBuffer) and render it, advancing our
                 // currentDrawX index
-                PPUTileFetch toRender = tileFetch;
+                PPUTileFetch toRender = tileBuffer[1];
+                tileBuffer[1] = tileBuffer[0];
+                tileBuffer[0] = tileFetch;
                 
                 uint8_t start = 0;
                 uint8_t end = 8;
@@ -193,15 +195,13 @@ void NESDL_PPU::HandleProcessVisibleScanline()
                 }
                 
                 // Not sure how else to pull this off? We want to render the last tile at 0x#400/0x#C00
-                // I think I messed up the part where the PPU preloads two tiles for rendering at the end of the last
-                // scanline, since this part should've been done already I believe
                 if (tileIndex == 31 && (registers.x & 0x7) != 0x00)
                 {
                     FetchAndStoreTile(1);
                     FetchAndStoreTile(3);
                     FetchAndStoreTile(5);
                     
-                    toRender = tileFetch;
+                    toRender = tileBuffer[1];
                     
                     uint8_t i = 0;
                     while (currentDrawX < 256)
@@ -268,12 +268,34 @@ void NESDL_PPU::HandleProcessVisibleScanline()
         }
         else if (currentScanlineCycle < 337)
         {
-            // "Run tile fetch for the next two tiles"
-            // But with the way things are set up, this is not needed
+            // Run tile fetch for the next two tiles
+            // For logic out-of-order reasons(?), modify Y register
+            registers.y += 1;
+            FetchAndStoreTile(pixelInFetchCycle);
+            registers.y -= 1;
+            if (pixelInFetchCycle == 7)
+            {
+//                PPUTileFetch toRender = tileBuffer[1];
+                tileBuffer[1] = tileBuffer[0];
+                tileBuffer[0] = tileFetch;
+                if ((registers.v & 0x001F) == 31)   // if coarse X == 31
+                {
+                    registers.v &= ~0x001F;         // coarse X = 0
+                    registers.v ^= 0x0400;          // switch horizontal nametable
+                }
+                else
+                {
+                    registers.v += 1;               // increment coarse X
+                }
+            }
         }
         else if (currentScanlineCycle < 341)
         {
-            // Two NT bytes are fetched but is really not necessary (except for maper MMC5, we can write a special case in for that)
+            // Two NT bytes are fetched, replicated for mapper timing purposes (eg. MMC2, MMC5)
+            if (currentScanlineCycle % 2 == 1)
+            {
+                FetchAndStoreTile(1);
+            }
         }
     }
     else
@@ -284,10 +306,10 @@ void NESDL_PPU::HandleProcessVisibleScanline()
     }
     
     // SPRITE LOGIC - don't run if sprite rendering is disabled (or we're on line 0, we don't run)
-    if ((registers.mask & PPUMASK_SPRENABLE) != 0x00 && currentScanline > 0)
+    if ((registers.mask & PPUMASK_SPRENABLE) != 0x00)
     {
         // Draw this line's sprite data
-        if (currentScanlineCycle < 256)
+        if (currentScanlineCycle < 256 && currentScanline > 0)
         {
             for (int i = 0; i < sprDataToDrawCount; ++i)
             {
@@ -943,11 +965,11 @@ void NESDL_PPU::WriteToVRAM(uint16_t addr, uint8_t data)
     else if (addr >= 0x3F00)
     {
         uint16_t index = (addr - 0x3F00) % 0x20;
-        paletteData[index] = data;
+        paletteData[index] = data & 0x3F; // 6-bit only
         // Palette data for color index 0 is mirrored across both BG and sprite palettes
         if (index % 4 == 0)
         {
-            paletteData[index >= 0x10 ? (index-0x10) : (index+0x10)] = data;
+            paletteData[index >= 0x10 ? (index-0x10) : (index+0x10)] = data & 0x3F; // 6-bit only
         }
     }
 }

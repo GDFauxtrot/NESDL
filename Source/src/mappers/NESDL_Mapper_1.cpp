@@ -34,12 +34,6 @@ void NESDL_Mapper_1::InitROMData(uint8_t* prgROMData, uint8_t prgROMBanks, uint8
     prgRAMEnable = true;
 }
 
-void NESDL_Mapper_1::SetMirroringData(bool data)
-{
-    // We use the bit from the header to determine mirroring
-    mirroringMode = data ? MirroringMode::Vertical : MirroringMode::Horizontal;
-}
-
 uint8_t NESDL_Mapper_1::ReadByte(uint16_t addr)
 {
     if (addr < 0x1000)

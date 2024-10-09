@@ -54,11 +54,11 @@ public:
 	NESDL_RAM* ram;
 	NESDL_APU* apu;
     NESDL_Input* input;
+    NESDL_Mapper* mapper;
     
     bool romLoaded;
 private:
     NESDL_SDL* sdlCtx;
-    NESDL_Mapper* mapper;
     
     double timeSinceStartup;
     bool paused;

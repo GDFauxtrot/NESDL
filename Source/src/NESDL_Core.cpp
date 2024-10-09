@@ -121,6 +121,9 @@ void NESDL_Core::LoadROM(const char* path)
         case 1:
             mapper = new NESDL_Mapper_1(this);
             break;
+        case 9:
+            mapper = new NESDL_Mapper_9(this);
+            break;
         default:
             printf("ROM uses an unsupported mapper! #%d\n", mapperNum);
             file.close();
