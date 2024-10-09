@@ -4,7 +4,7 @@ A NES emulator written in C++ and SDL2. Just a fun project to see if I could mak
 
 **Note:** this is *EARLY* in development! It is missing several features, such as:
 
-  * (most importantly) **NROM titles ONLY!** That means only NTSC (US) titles from [this list](https://nescartdb.com/search/advanced?ines=0) work.
+  * Some popular ROM mappers (like MMC3, for now)
   * Player 2 (the logic is in place, but no keybinds yet)
   * Non-standard controller support (eg. Zapper, Power Pad, and so on)
   * Rebindable controls
@@ -13,6 +13,7 @@ A NES emulator written in C++ and SDL2. Just a fun project to see if I could mak
   * PAL region support
 
 ![](img/title.png)
+
 
 ## Controls
 
@@ -27,7 +28,7 @@ Currently, controls are hard-bound to the keyboard (mainly for me to use while d
 
 ## To-Do
 
-***Each action item is checkmarked to show progress*** (Updated 10/7/2024)
+***Each action item is checkmarked to show progress*** (Updated 10/9/2024)
 
 ### General/Misc
 
@@ -40,6 +41,7 @@ Currently, controls are hard-bound to the keyboard (mainly for me to use while d
 - [ ] Rebindable keys menu
   * May be more difficult since I'm not using QT/IMGUI which would've possibly made this a breeze. Hopefully SDL has something
 - [ ] Famicom emulation (& PAL support)
+
 
 ### Mappers
 
@@ -61,12 +63,13 @@ Low priority:
 
 Some notable mappers I want implemented as well:
 
-- [ ] Mapper 9 (just (Mike Tyson's) Punch-Out!!)
+- [x] Mapper 9 (just (Mike Tyson's) Punch-Out!!)
 
 
 ## Building
 
 Windows and Mac build information (and builds) can be provided soon. I am currently prioritizing development as the project is so early, namely getting more titles supported and controls support.
+
 
 ## License
 
