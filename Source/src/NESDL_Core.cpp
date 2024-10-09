@@ -57,6 +57,7 @@ void NESDL_Core::Update(double deltaTime)
         if (ppu->frameDataReady)
         {
             ppu->frameDataReady = false;
+            ppu->UpdateNTFrameData();
             sdlCtx->UpdateScreenTexture();
         }
         // We ignore the paused flag if we're CPU stepping,
@@ -257,4 +258,8 @@ void NESDL_Core::Action_DebugShowCPU()
 void NESDL_Core::Action_DebugShowPPU()
 {
     sdlCtx->ToggleShowPPU();
+}
+void NESDL_Core::Action_DebugShowNT()
+{
+    sdlCtx->ToggleShowNT();
 }

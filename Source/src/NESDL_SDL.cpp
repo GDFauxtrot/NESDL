@@ -43,7 +43,7 @@ void NESDL_SDL::SDLInit()
         SDL_SetWindowTitle(window, NESDL_WINDOW_NAME.c_str());
         SDL_SetWindowResizable(window, SDL_TRUE);
         SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-
+        
         if (window == NULL)
         {
             printf("Window could not be created! SDL_Error: %s\n", SDL_GetError());
@@ -72,6 +72,30 @@ void NESDL_SDL::SDLInit()
                 SDL_RenderFillRect(renderer, &r);
             }
             SDL_SetRenderTarget(renderer, nullptr);
+        }
+        
+        // Create nametable debug window and renderer
+        SDL_CreateWindowAndRenderer(256, 256, // 64x64 but rendered 4x, since it's so tiny
+            SDL_WINDOW_HIDDEN, &debugWindow, &debugRenderer);
+        SDL_SetWindowTitle(debugWindow, "NESDL NT Debug");
+        SDL_SetWindowResizable(debugWindow, SDL_TRUE);
+
+        if (debugWindow == NULL)
+        {
+            printf("Window could not be created! SDL_Error: %s\n", SDL_GetError());
+        }
+        else
+        {
+            // Create window texture to draw onto
+            debugTexture = SDL_CreateTexture(debugRenderer,
+                SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING,
+                64, 64);
+            
+            // Fill the renderer black on clear
+            SDL_SetRenderDrawColor(debugRenderer, 0, 0, 0, 255);
+            // Clear screen to black and present
+            SDL_RenderClear(debugRenderer);
+            SDL_RenderPresent(debugRenderer);
         }
     }
     
@@ -191,11 +215,36 @@ void NESDL_SDL::UpdateScreen(double fps)
     }
     
     SDL_RenderPresent(renderer);
+    
+    // Debug Window
+    SDL_RenderClear(debugRenderer);
+    SDL_RenderCopy(debugRenderer, debugTexture, NULL, NULL);
+    SDL_RenderPresent(debugRenderer);
 }
 
 void NESDL_SDL::UpdateScreenTexture()
 {
     SDL_UpdateTexture(texture, NULL, core->ppu->frameData, NESDL_SCREEN_WIDTH * sizeof(uint32_t));
+    SDL_UpdateTexture(debugTexture, NULL, core->ppu->ntFrameData, 64 * sizeof(uint32_t));
+}
+
+void NESDL_SDL::GetCloseWindowEvent(SDL_WindowEvent event)
+{
+    uint32_t winID = SDL_GetWindowID(window);
+    uint32_t debugWinID = SDL_GetWindowID(debugWindow);
+    
+    // Main window exit - just let SDL know we're good and done here
+    if (event.windowID == winID)
+    {
+        SDL_Event quit { SDL_QUIT };
+        SDL_PushEvent(&quit);
+    }
+    // Debug window exit - hide it and reset the shown flag
+    if (event.windowID == debugWinID)
+    {
+        showNTDebugWindow = false;
+        SDL_HideWindow(debugWindow);
+    }
 }
 
 void NESDL_SDL::ToggleFrameInfo()
@@ -262,6 +311,20 @@ void NESDL_SDL::ToggleShowPPU()
     else
     {
         RemoveScreenText("ppu");
+    }
+}
+
+void NESDL_SDL::ToggleShowNT()
+{
+    showNTDebugWindow = !showNTDebugWindow;
+    
+    if (showNTDebugWindow)
+    {
+        SDL_ShowWindow(debugWindow);
+    }
+    else
+    {
+        SDL_HideWindow(debugWindow);
     }
 }
 

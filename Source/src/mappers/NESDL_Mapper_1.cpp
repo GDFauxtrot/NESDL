@@ -31,6 +31,7 @@ void NESDL_Mapper_1::InitROMData(uint8_t* prgROMData, uint8_t prgROMBanks, uint8
     chrROM0Index = 0;
     chrROM1Index = 1;
     
+    prgRAMEnable = true;
 }
 
 void NESDL_Mapper_1::SetMirroringData(bool data)
@@ -50,9 +51,14 @@ uint8_t NESDL_Mapper_1::ReadByte(uint16_t addr)
         return chrROM[chrROM1Index * 0x1000 + (addr - 0x1000)];
     }
     
-    // Nothing else happens until we get to PRG-ROM address space
-    
-    if (addr >= 0x8000 && addr < 0xC000)
+    if (addr >= 0x6000 && addr < 0x8000)
+    {
+        if (prgRAMEnable)
+        {
+            return prgRAM[addr - 0x6000];
+        }
+    }
+    else if (addr >= 0x8000 && addr < 0xC000)
     {
         return prgROM[prgROM0Index * 0x4000 + (addr - 0x8000)];
     }
@@ -75,16 +81,19 @@ void NESDL_Mapper_1::WriteByte(uint16_t addr, uint8_t data)
             chrROM[chrROM0Index * 0x1000 + addr] = data;
         }
         else if (addr < 0x2000)
-            
         {
             chrROM[chrROM1Index * 0x1000 + (addr - 0x1000)] = data;
         }
     }
     
-    // TODO
-    // 0x6000-0x7FFF (PRG-RAM) is currently unimplemented
-    
-    if (addr >= 0x8000)
+    if (addr >= 0x6000 && addr < 0x8000)
+    {
+        if (prgRAMEnable)
+        {
+            prgRAM[addr - 0x6000] = data;
+        }
+    }
+    else if (addr >= 0x8000)
     {
         // Clear latch if bit 7 is ever written to
         if ((data & 0x80) == 0x80)
@@ -165,19 +174,19 @@ void NESDL_Mapper_1::WriteCHRBank(uint8_t index)
     if (!chrROMMode)
     {
         // 8KB mode - CHR addr 0x1000 proceeds data from 0x0000
-        uint8_t value = shiftRegister & 0x0E; // Low bit ignored (CHR-ROM can't be 0x1000-0x2000, for instance - start address must be even)
+        uint8_t value = shiftRegister & 0x1E; // Low bit ignored (CHR-ROM can't be 0x1000-0x2000, for instance - start address must be even)
         chrROM0Index = value;
         chrROM1Index = value + 1;
     }
     else
     {
         // 4KB mode - each bank gets treated separately
-        uint8_t value = shiftRegister & 0x0F;
+        uint8_t value = shiftRegister & 0x1F;
         if (index == 0)
         {
             chrROM0Index = value;
         }
-        else
+        else if (chrROMMode)
         {
             chrROM1Index = value;
         }

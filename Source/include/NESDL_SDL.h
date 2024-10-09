@@ -26,11 +26,13 @@ public:
     void SetCore(NESDL_Core* coreRef);
 	void UpdateScreen(double fps);
     void UpdateScreenTexture();
+    void GetCloseWindowEvent(SDL_WindowEvent event);
     
     void ToggleFrameInfo();
     void Resize(int resize);
     void ToggleShowCPU();
     void ToggleShowPPU();
+    void ToggleShowNT();
     
     // Functions for handling on-screen text (NESDL_Text)
     NESDL_Text* AddNewScreenText(const char* id, const char* text, int x, int y);
@@ -57,4 +59,9 @@ private:
     bool showFrameInfo;
     bool showCPU;
     bool showPPU;
+    bool showNTDebugWindow;
+    
+    SDL_Window* debugWindow;
+    SDL_Renderer* debugRenderer;
+    SDL_Texture* debugTexture;
 };

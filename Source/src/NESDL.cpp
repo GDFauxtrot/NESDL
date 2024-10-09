@@ -73,6 +73,10 @@ int main(int argc, char* args[])
             {
                 isRunning = false;
             }
+            if (e.type == SDL_WINDOWEVENT && e.window.event == SDL_WINDOWEVENT_CLOSE)
+            {
+                sdlCtx->GetCloseWindowEvent(e.window);
+            }
         }
         
         // Advance the core by the amount of time taken this loop

@@ -47,6 +47,7 @@ public:
     void Action_DebugStepPPU();
     void Action_DebugShowCPU();
     void Action_DebugShowPPU();
+    void Action_DebugShowNT();
     
 	NESDL_CPU* cpu;
 	NESDL_PPU* ppu;

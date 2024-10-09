@@ -29,6 +29,7 @@
 - (void) debugStepPPU:(nullable id)sender;
 - (void) debugShowCPU:(nullable id)sender;
 - (void) debugShowPPU:(nullable id)sender;
+- (void) debugShowNT:(nullable id)sender;
 @end
 
 @implementation NESDLMac
@@ -86,6 +87,7 @@ NSMenu* AddSubMenuToMenuItem(NSMenuItem* menuItem)
     CreateMenuItemAndAddToMenu(viewMenu, self, @"Show Frame Info", @selector(viewFrameInfo:), @"");
     CreateMenuItemAndAddToMenu(viewMenu, self, @"Show CPU Info", @selector(debugShowCPU:), @"");
     CreateMenuItemAndAddToMenu(viewMenu, self, @"Show PPU Info", @selector(debugShowPPU:), @"");
+    CreateMenuItemAndAddToMenu(viewMenu, self, @"Show NT Viewer", @selector(debugShowNT:), @"");
     menuItem = [[NSMenuItem alloc] init];
     [menuItem setSubmenu:viewMenu];
     [[NSApp mainMenu] insertItem:menuItem atIndex:2];
@@ -152,6 +154,9 @@ NSMenu* AddSubMenuToMenuItem(NSMenuItem* menuItem)
 }
 - (void) debugShowPPU:(nullable id)sender {
     nesdl.core->Action_DebugShowPPU();
+}
+- (void) debugShowNT:(nullable id)sender {
+    nesdl.core->Action_DebugShowNT();
 }
 
 @end

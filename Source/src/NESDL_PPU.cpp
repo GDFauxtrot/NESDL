@@ -678,7 +678,29 @@ void NESDL_PPU::PreprocessPPUForReadInstructionTiming(uint8_t instructionPPUTime
             registers.status &= 0x1F;
         }
     }
-    
+}
+
+void NESDL_PPU::UpdateNTFrameData()
+{
+    memset(ntFrameData, 0x00, sizeof(ntFrameData));
+    for (uint16_t i = 0x2000; i < 0x3000; ++i)
+    {
+        uint16_t a = GetMirroredAddress(i);
+        uint32_t c = 0xFF000000 | (vram[a - 0x2000] << 16) | (vram[a - 0x2000] << 8) | vram[a - 0x2000];
+        
+        uint16_t p = i - (0x2000 + ((i - 0x2000) / 0x400) * 0x400);
+        uint8_t pRow = p / 32;
+        uint8_t pInRow = p % 32;
+        if (i >= 0x2800)
+        {
+            pRow += 32;
+        }
+        if (i % 0x800 >= 0x400)
+        {
+            pInRow += 32;
+        }
+        ntFrameData[(pRow * 64) + pInRow] = c;
+    }
 }
 
 void NESDL_PPU::WriteToRegister(uint16_t registerAddr, uint8_t data)
@@ -943,12 +965,16 @@ uint16_t NESDL_PPU::GetMirroredAddress(uint16_t addr)
             {
                 addr -= 0x400;
             }
+            if (addr >= 0x2800) // Map addr NT 2 to physical NT 1
+            {
+                addr -= 0x400;
+            }
             break;
         case MirroringMode::Vertical:
             // Vertical mirror - NT 0 maps to 2, NT 1 maps to 3
             if (addr >= 0x2800)
             {
-                addr = 0x2000 | (addr % 0x800);
+                addr -= 0x800;
             }
             break;
         case MirroringMode::One_LowerBank:

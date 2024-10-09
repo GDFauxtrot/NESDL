@@ -107,9 +107,11 @@ public:
     uint32_t GetColor(uint16_t pattern, uint32_t palette, uint8_t pixelIndex);
     uint8_t GetPatternBits(uint16_t pattern, uint8_t pixelIndex);
     void PreprocessPPUForReadInstructionTiming(uint8_t instructionPPUTime);
+    void UpdateNTFrameData();
     PPURegisters registers;
     uint32_t frameData[NESDL_SCREEN_WIDTH * NESDL_SCREEN_HEIGHT]; // Frame buffer
     uint8_t frameDataSprite[NESDL_SCREEN_WIDTH * NESDL_SCREEN_HEIGHT]; // Some per-pixel data
+    uint32_t ntFrameData[0x1000]; // Frame buffer
     bool ignoreChanges;
     bool incrementV;
     uint64_t currentFrame;

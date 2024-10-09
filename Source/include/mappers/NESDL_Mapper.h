@@ -72,5 +72,7 @@ private:
     uint8_t chrROM0Index; // CHR  4KB bank 1
     uint8_t chrROM1Index; // CHR  4KB bank 2
     uint8_t prgROMMode;
+    uint8_t prgRAM[0x2000];
     bool chrROMMode;
+    bool prgRAMEnable;
 };
