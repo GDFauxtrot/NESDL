@@ -569,6 +569,7 @@ void NESDL_PPU::HandleProcessVBlankScanline()
                 core->cpu->nmi = true;
             }
             disregardVBL = false;
+            disregardNMI = false;
         }
     }
     else if (currentScanline == 261)

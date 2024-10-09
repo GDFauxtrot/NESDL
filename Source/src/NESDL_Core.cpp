@@ -146,7 +146,17 @@ void NESDL_Core::LoadROM(const char* path)
     file.close();
     
     // Initialize mapper with all of its pertinent data
-    mapper->InitROMData(prgROM->data(), romBankCount, chrROM->data(), vromBankCount);
+    uint8_t* prgPtr = nullptr;
+    if (romBankCount > 0)
+    {
+        prgPtr = prgROM->data();
+    }
+    uint8_t* chrPtr = nullptr;
+    if (vromBankCount > 0)
+    {
+        chrPtr = chrROM->data();
+    }
+    mapper->InitROMData(prgPtr, romBankCount, chrPtr, vromBankCount);
     
     // Let components know we exist
     ram->SetMapper(mapper);
@@ -167,6 +177,11 @@ bool NESDL_Core::IsROMLoaded()
 
 void NESDL_Core::Action_OpenROM()
 {
+    if (romLoaded)
+    {
+        Action_CloseROM();
+    }
+    
     nfdchar_t *romFilePath = NULL;
     nfdresult_t result = NFD_OpenDialog("nes", NULL, &romFilePath);
     // Don't continue if we didn't successfully choose a file, or (somehow) it's empty

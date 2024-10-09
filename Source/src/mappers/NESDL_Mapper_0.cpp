@@ -6,12 +6,18 @@ void NESDL_Mapper_0::InitROMData(uint8_t* prgROMData, uint8_t prgROMBanks, uint8
     chrBanks = chrROMBanks;
     
     // Init PRG-ROM data
-    prgROM = new uint8_t[prgBanks * 0x4000];
-    memcpy(prgROM, prgROMData, prgBanks * 0x4000);
+    if (prgBanks > 0)
+    {
+        prgROM = new uint8_t[prgBanks * 0x4000];
+        memcpy(prgROM, prgROMData, prgBanks * 0x4000);
+    }
     
     // Init CHR-ROM Data
-    chrROM = new uint8_t[chrBanks * 0x2000];
-    memcpy(chrROM, chrROMData, chrBanks * 0x2000);
+    if (chrBanks > 0)
+    {
+        chrROM = new uint8_t[chrBanks * 0x2000];
+        memcpy(chrROM, chrROMData, chrBanks * 0x2000);
+    }
 }
 
 void NESDL_Mapper_0::SetMirroringData(bool data)

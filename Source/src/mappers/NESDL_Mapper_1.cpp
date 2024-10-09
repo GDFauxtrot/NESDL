@@ -6,16 +6,28 @@ void NESDL_Mapper_1::InitROMData(uint8_t* prgROMData, uint8_t prgROMBanks, uint8
     chrBanks = chrROMBanks;
     
     // Init PRG-ROM data
-    prgROM = new uint8_t[prgBanks * 0x4000];
-    memcpy(prgROM, prgROMData, prgBanks * 0x4000);
+    if (prgBanks > 0)
+    {
+        prgROM = new uint8_t[prgBanks * 0x4000];
+        memcpy(prgROM, prgROMData, prgBanks * 0x4000);
+    }
     
     // Init CHR-ROM Data
-    chrROM = new uint8_t[chrBanks * 0x2000];
-    memcpy(chrROM, chrROMData, chrBanks * 0x2000);
+    if (chrBanks > 0)
+    {
+        chrROM = new uint8_t[chrBanks * 0x2000];
+        memcpy(chrROM, chrROMData, chrBanks * 0x2000);
+    }
+    else
+    {
+        // Assume 8KB of CHR-RAM
+        chrROM = new uint8_t[0x2000];
+        memset(chrROM, 0x00, 0x2000);
+    }
     
-    // Assume we start in 32KB PRG and 8KB CHR mode
+    // Assume we start in PRG-ROM bank mode 3 (confirmed?) and 8KB CHR mode
     prgROM0Index = 0;
-    prgROM1Index = 1;
+    prgROM1Index = (prgBanks-1);
     chrROM0Index = 0;
     chrROM1Index = 1;
     
@@ -54,6 +66,21 @@ uint8_t NESDL_Mapper_1::ReadByte(uint16_t addr)
 
 void NESDL_Mapper_1::WriteByte(uint16_t addr, uint8_t data)
 {
+    // If we have no CHR-ROM banks, assume CHR-RAM is on-board and make
+    // this address space writable
+    if (chrBanks == 0)
+    {
+        if (addr < 0x1000)
+        {
+            chrROM[chrROM0Index * 0x1000 + addr] = data;
+        }
+        else if (addr < 0x2000)
+            
+        {
+            chrROM[chrROM1Index * 0x1000 + (addr - 0x1000)] = data;
+        }
+    }
+    
     // TODO
     // 0x6000-0x7FFF (PRG-RAM) is currently unimplemented
     
