@@ -39,6 +39,8 @@ public:
 	void Init(NESDL_Core* c);
     void Reset(bool hardReset);
 	void Update(uint32_t ppuCycles);
+    void DidMapperWrite();
+    bool IsConsecutiveMapperWrite();
     
     uint64_t elapsedCycles;
     CPURegisters registers;
@@ -118,4 +120,7 @@ private:
 	NESDL_Core* core;
     AddressModeResult* addrModeResult;
     int16_t ppuCycleCounter;
+    
+    bool didMapperWrite;
+    bool wasLastInstructionAMapperWrite; // Not happy with this, but needed
 };

@@ -82,6 +82,9 @@ void NESDL_CPU::Update(uint32_t ppuCycles)
             
             ppuCycleCounter -= nextInstructionPPUTime;
             RunNextInstruction();
+            
+            wasLastInstructionAMapperWrite = didMapperWrite;
+            didMapperWrite = false;
         }
     }
     ppuCycleCounter += ppuCycles;
@@ -1551,4 +1554,14 @@ void NESDL_CPU::HaltCPUForDMAWrite()
     uint16_t delay = elapsedCycles % 2 == 0 ? 514 : 513;
     elapsedCycles += delay;
     ppuCycleCounter -= delay*3;
+}
+
+void NESDL_CPU::DidMapperWrite()
+{
+    didMapperWrite = true;
+}
+
+bool NESDL_CPU::IsConsecutiveMapperWrite()
+{
+    return wasLastInstructionAMapperWrite;
 }

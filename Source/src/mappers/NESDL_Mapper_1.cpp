@@ -95,6 +95,8 @@ void NESDL_Mapper_1::WriteByte(uint16_t addr, uint8_t data)
     }
     else if (addr >= 0x8000)
     {
+        core->cpu->DidMapperWrite();
+        
         // Clear latch if bit 7 is ever written to
         if ((data & 0x80) == 0x80)
         {
@@ -103,8 +105,12 @@ void NESDL_Mapper_1::WriteByte(uint16_t addr, uint8_t data)
             return;
         }
         
-        // TODO consecutive-cycle write ignore?
+        // Ignore successive writes
         // https://www.nesdev.org/wiki/MMC1#Consecutive-cycle_writes
+        if (core->cpu->IsConsecutiveMapperWrite())
+        {
+//            return;
+        }
         
         // It takes 5 consecutive writes to fill the shift register
         // and send it to where it needs to go
