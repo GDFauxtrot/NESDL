@@ -24,7 +24,7 @@ uint8_t NESDL_RAM::ReadByte(uint16_t addr)
     // 0x4000 - 0x4013, 0x4015 : APU registers
     else if (addr < 0x4016)
     {
-        
+        return core->apu->ReadByte(addr);
     }
     // 0x4016, 0x4017 : Joystick 1/2 input
     else if (addr < 0x4018)
@@ -85,7 +85,7 @@ void NESDL_RAM::WriteByte(uint16_t addr, uint8_t data)
     // 0x4000 - 0x4013, 0x4015 : APU registers
     else if (addr < 0x4016)
     {
-        
+        core->apu->WriteByte(addr, data);
     }
     // 0x4016, 0x4017 : Joystick 1/2 input (fun fact: JOY2 WRITE is APU frame counter info! Weird huh
     else if (addr < 0x4018)

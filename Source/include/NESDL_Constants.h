@@ -14,13 +14,12 @@ const string NESDL_WINDOW_NAME = "NESDL";
 #define PPU_HEIGHT 240
 
 // Measured in hz
-const uint32_t NESDL_MASTER_CLOCK = 21477273; // 236.25 MHz / 11, by definition
-const uint32_t NESDL_CPU_CLOCK = NESDL_MASTER_CLOCK / 12; // 3 PPU dots per cycle, 12x slower than master
-const uint32_t NESDL_PPU_CLOCK = NESDL_MASTER_CLOCK / 4; // 4 clocks per dot, 3x faster than CPU
+#define NESDL_MASTER_CLOCK 21477273 // 236.25 MHz / 11, by definition
+#define NESDL_PPU_CLOCK (NESDL_MASTER_CLOCK / 4) // 4 clocks per dot, 3x faster than CPU
 
 // CPU clock cycles for the PPU to "warm up" (more specifically, the
 // "pre-render scanline of the next frame" on NTSC)
-const uint32_t NESDL_PPU_READY = 29658;
+#define NESDL_PPU_READY 29658
 
 // SDL takes color in format ARGB
 static uint32_t MakeColor(uint8_t r, uint8_t g, uint8_t b)
@@ -50,4 +49,49 @@ const uint32_t NESDL_PALETTE[0x40] =
     MakeColor(0xF7,0xC3,0xFF), MakeColor(0xFF,0xC4,0xEE), MakeColor(0xFF,0xCB,0xC9), MakeColor(0xF7,0xD7,0xA9),
     MakeColor(0xE6,0xE3,0x97), MakeColor(0xD1,0xEE,0x97), MakeColor(0xBF,0xF3,0xA9), MakeColor(0xB5,0xF2,0xC9),
     MakeColor(0xB5,0xEB,0xEE), MakeColor(0xB8,0xB8,0xB8), MakeColor(0x00,0x00,0x00), MakeColor(0x00,0x00,0x00)
+};
+
+#define APU_SAMPLE_RATE 44100
+#define APU_SAMPLE_BUF 1024
+
+// APU square duties (four selectable "sounds" for the two square channels)
+// https://www.nesdev.org/wiki/APU_Pulse
+const uint8_t NESDL_SQUARE_DUTY[32] =
+{
+    0, 0, 0, 0, 0, 0, 0, 1, // 12.5%
+    0, 0, 0, 0, 0, 0, 1, 1, // 25%
+    0, 0, 0, 0, 1, 1, 1, 1, // 50%
+    1, 1, 1, 1, 1, 1, 0, 0  // 75% (25% Flipped)
+};
+
+// APU triangle values (0-15)
+// https://www.nesdev.org/wiki/APU_Triangle
+const uint8_t NESDL_TRI_DUTY[32] =
+{
+    15,14,13,12,11,10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0,
+     0, 1, 2, 3, 4, 5, 6, 7, 8, 9,10,11,12,13,14,15
+};
+
+// APU length counter corresponding timers
+// https://www.nesdev.org/wiki/APU_Length_Counter
+const uint8_t NESDL_LENGTH_COUNTER[32] =
+{
+    10,254, 20,  2, 40,  4, 80,  6, 160,  8, 60, 10, 14, 12, 26, 14,
+    12, 16, 24, 18, 48, 20, 96, 22, 192, 24, 72, 26, 16, 28, 32, 30
+};
+
+// APU noise period timers
+// https://www.nesdev.org/wiki/APU_Noise
+const uint16_t NESDL_NOISE_PERIOD[16] =
+{
+      4,   8,  16,  32,  64,   96,  128,  160,
+    202, 254, 380, 508, 762, 1016, 2034, 4068
+};
+
+// DMC sample playback CPU rate
+// https://www.nesdev.org/wiki/APU_DMC
+const uint16_t NESDL_DMC_RATE[16]
+{
+    428, 380, 340, 320, 286, 254, 226, 214,
+    190, 160, 142, 128, 106,  84,  72,  54
 };

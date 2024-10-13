@@ -18,7 +18,7 @@ void NESDL_Core::Init(NESDL_SDL* sdl)
 	cpu->Init(this);
     ppu->Init(this);
     ram->Init(this);
-//    apu->Init(this);
+    apu->Init(this, sdlCtx);
     input->Init(this);
     
     // Connect player 1 controller from the start
@@ -48,9 +48,10 @@ void NESDL_Core::Update(double deltaTime)
     }
     for (uint32_t i = 0; i < ppuCycles; ++i)
     {
-        // Send current timeSinceStartup to CPU and PPU to handle their own cycle updates
+        // Send PPU cycles (finest clock cycle in the hardware) to handle their own cycle updates
         cpu->Update(1);
         ppu->Update(1);
+        apu->Update(1);
         
         // Only update SDL screen texture IF the visible screen has finished being drawn to
         // Prevents visible screen tearing from mid-frame drawing
@@ -181,11 +182,6 @@ bool NESDL_Core::IsROMLoaded()
 
 void NESDL_Core::Action_OpenROM()
 {
-    if (romLoaded)
-    {
-        Action_CloseROM();
-    }
-    
     nfdchar_t *romFilePath = NULL;
     nfdresult_t result = NFD_OpenDialog("nes", NULL, &romFilePath);
     // Don't continue if we didn't successfully choose a file, or (somehow) it's empty
@@ -193,8 +189,15 @@ void NESDL_Core::Action_OpenROM()
     {
         return;
     }
+    else
+    {
+        Action_CloseROM();
+    }
     LoadROM(romFilePath);
-    Action_ResetHard();
+    if (romLoaded)
+    {
+        Action_ResetHard();
+    }
 }
 void NESDL_Core::Action_CloseROM()
 {

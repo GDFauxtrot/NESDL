@@ -41,6 +41,7 @@ public:
 	void Update(uint32_t ppuCycles);
     void DidMapperWrite();
     bool IsConsecutiveMapperWrite();
+    void HaltCPUForDMC();
     
     uint64_t elapsedCycles;
     CPURegisters registers;

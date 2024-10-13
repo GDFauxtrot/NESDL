@@ -1558,6 +1558,13 @@ void NESDL_CPU::HaltCPUForDMAWrite()
     ppuCycleCounter -= delay*3;
 }
 
+void NESDL_CPU::HaltCPUForDMC()
+{
+    uint8_t delay = elapsedCycles % 2 == 0 ? 3 : 4;
+    elapsedCycles += delay;
+    ppuCycleCounter -= delay*3;
+}
+
 void NESDL_CPU::DidMapperWrite()
 {
     didMapperWrite = true;

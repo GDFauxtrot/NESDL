@@ -1,5 +1,5 @@
 #include "NESDL.h"
-
+#include <cmath>
 
 // https://stackoverflow.com/questions/2342162/stdstring-formatting-like-sprintf
 template<typename ... Args>
@@ -25,78 +25,99 @@ std::string print_bin(uint8_t byte)
     return output;
 }
 
+void NESDL_SDL::WriteNextAPUSignal(float signal)
+{
+    SDL_QueueAudio(audioDevice, &signal, 4);
+}
+
 void NESDL_SDL::SDLInit()
 {
     // Clear the window ptr we'll be rendering to
     window = NULL;
-
+    
     // Initialize SDL
     if (SDL_Init(SDL_INIT_EVERYTHING) < 0)
     {
         printf("SDL could not initialize! SDL_Error: %s\n", SDL_GetError());
+        return;
+    }
+    
+    // Initialize SDL audio
+    SDL_AudioSpec spec =
+    {
+        .format = AUDIO_F32,
+        .channels = 1,
+        .freq = APU_SAMPLE_RATE,
+        .samples = APU_SAMPLE_BUF,
+        .callback = NULL,
+        .userdata = this
+    };
+    audioDevice = SDL_OpenAudioDevice(NULL, 0, &spec, NULL, SDL_AUDIO_ALLOW_ANY_CHANGE);
+    if (audioDevice <= 0)
+    {
+        printf("Failed to open Audio Device: %s\n", SDL_GetError());
+    }
+    SDL_PauseAudioDevice(audioDevice, 0);
+    
+    // Create window and renderer
+    SDL_CreateWindowAndRenderer(NESDL_SCREEN_WIDTH, NESDL_SCREEN_HEIGHT,
+        SDL_WINDOW_SHOWN, &window, &renderer);
+    SDL_SetWindowTitle(window, NESDL_WINDOW_NAME.c_str());
+    SDL_SetWindowResizable(window, SDL_TRUE);
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+    
+    if (window == NULL)
+    {
+        printf("Window could not be created! SDL_Error: %s\n", SDL_GetError());
     }
     else
     {
-        // Create window and renderer
-        SDL_CreateWindowAndRenderer(NESDL_SCREEN_WIDTH, NESDL_SCREEN_HEIGHT,
-            SDL_WINDOW_SHOWN, &window, &renderer);
-        SDL_SetWindowTitle(window, NESDL_WINDOW_NAME.c_str());
-        SDL_SetWindowResizable(window, SDL_TRUE);
-        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+        // Create window texture to draw onto
+        texture = SDL_CreateTexture(renderer,
+            SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING,
+            NESDL_SCREEN_WIDTH, NESDL_SCREEN_HEIGHT);
         
-        if (window == NULL)
-        {
-            printf("Window could not be created! SDL_Error: %s\n", SDL_GetError());
-        }
-        else
-        {
-            // Create window texture to draw onto
-            texture = SDL_CreateTexture(renderer,
-                SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING,
-                NESDL_SCREEN_WIDTH, NESDL_SCREEN_HEIGHT);
-            
-            // Fill the renderer black on clear
-            SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
-            // Clear screen to black and present
-            SDL_RenderClear(renderer);
-            SDL_RenderPresent(renderer);
-            
-            // Get a pre-made "scanline" texture ready to go
-            scanlineTexture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_TARGET, NESDL_SCREEN_WIDTH, NESDL_SCREEN_HEIGHT);
-            SDL_SetTextureBlendMode(scanlineTexture, SDL_BLENDMODE_BLEND);
-            SDL_SetRenderDrawColor(renderer, 16, 0, 48, 64);
-            SDL_SetRenderTarget(renderer, scanlineTexture);
-            for (int y = 0; y < NESDL_SCREEN_HEIGHT; y += 4)
-            {
-                SDL_Rect r = { 0, y, NESDL_SCREEN_WIDTH, 2 };
-                SDL_RenderFillRect(renderer, &r);
-            }
-            SDL_SetRenderTarget(renderer, nullptr);
-        }
+        // Fill the renderer black on clear
+        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+        // Clear screen to black and present
+        SDL_RenderClear(renderer);
+        SDL_RenderPresent(renderer);
         
-        // Create nametable debug window and renderer
-        SDL_CreateWindowAndRenderer(256, 256, // 64x64 but rendered 4x, since it's so tiny
-            SDL_WINDOW_HIDDEN, &debugWindow, &debugRenderer);
-        SDL_SetWindowTitle(debugWindow, "NESDL NT Debug");
-        SDL_SetWindowResizable(debugWindow, SDL_TRUE);
+        // Get a pre-made "scanline" texture ready to go
+        scanlineTexture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_TARGET, NESDL_SCREEN_WIDTH, NESDL_SCREEN_HEIGHT);
+        SDL_SetTextureBlendMode(scanlineTexture, SDL_BLENDMODE_BLEND);
+        SDL_SetRenderDrawColor(renderer, 16, 0, 48, 64);
+        SDL_SetRenderTarget(renderer, scanlineTexture);
+        for (int y = 0; y < NESDL_SCREEN_HEIGHT; y += 4)
+        {
+            SDL_Rect r = { 0, y, NESDL_SCREEN_WIDTH, 2 };
+            SDL_RenderFillRect(renderer, &r);
+        }
+        SDL_SetRenderTarget(renderer, nullptr);
+    }
+    
+    // Create nametable debug window and renderer
+    SDL_CreateWindowAndRenderer(256, 256, // 64x64 but rendered 4x, since it's so tiny
+        SDL_WINDOW_HIDDEN, &debugWindow, &debugRenderer);
+    SDL_SetWindowTitle(debugWindow, "NESDL NT Debug");
+    SDL_SetWindowResizable(debugWindow, SDL_TRUE);
 
-        if (debugWindow == NULL)
-        {
-            printf("Window could not be created! SDL_Error: %s\n", SDL_GetError());
-        }
-        else
-        {
-            // Create window texture to draw onto
-            debugTexture = SDL_CreateTexture(debugRenderer,
-                SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING,
-                64, 64);
-            
-            // Fill the renderer black on clear
-            SDL_SetRenderDrawColor(debugRenderer, 0, 0, 0, 255);
-            // Clear screen to black and present
-            SDL_RenderClear(debugRenderer);
-            SDL_RenderPresent(debugRenderer);
-        }
+    if (debugWindow == NULL)
+    {
+        printf("Window could not be created! SDL_Error: %s\n", SDL_GetError());
+    }
+    else
+    {
+        // Create window texture to draw onto
+        debugTexture = SDL_CreateTexture(debugRenderer,
+            SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING,
+            64, 64);
+        
+        // Fill the renderer black on clear
+        SDL_SetRenderDrawColor(debugRenderer, 0, 0, 0, 255);
+        // Clear screen to black and present
+        SDL_RenderClear(debugRenderer);
+        SDL_RenderPresent(debugRenderer);
     }
     
     //Initialize SDL_TTF
@@ -115,6 +136,7 @@ void NESDL_SDL::SDLQuit()
         SDL_DestroyTexture(textKV.second->texture);
     }
     
+    SDL_CloseAudio();
     TTF_CloseFont(font);
     SDL_DestroyTexture(texture);
     SDL_DestroyRenderer(renderer);

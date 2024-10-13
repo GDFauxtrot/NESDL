@@ -28,6 +28,8 @@ public:
     void UpdateScreenTexture();
     void GetCloseWindowEvent(SDL_WindowEvent event);
     
+    void WriteNextAPUSignal(float s);
+    
     void ToggleFrameInfo();
     void Resize(int resize);
     void ToggleShowCPU();
@@ -48,6 +50,8 @@ public:
     NESDL_Text* GetScreenText(const char* id);
     int GetScreenTextWidth(const char* id);
     int GetScreenTextHeight(const char* id);
+    
+    SDL_AudioDeviceID audioDevice;
 private:
     unordered_map<const char*, NESDL_Text*> screenText;
     TTF_Font* font;
@@ -56,6 +60,7 @@ private:
 	SDL_Renderer* renderer;
     SDL_Texture* texture;
     SDL_Texture* scanlineTexture;
+    
     bool showFrameInfo;
     bool showCPU;
     bool showPPU;
