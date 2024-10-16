@@ -18,6 +18,12 @@ void NESDL_Mapper_0::InitROMData(uint8_t* prgROMData, uint8_t prgROMBanks, uint8
         chrROM = new uint8_t[chrBanks * 0x2000];
         memcpy(chrROM, chrROMData, chrBanks * 0x2000);
     }
+    else
+    {
+        // Assume 8KB of CHR-RAM(?)
+        chrROM = new uint8_t[0x2000];
+        memset(chrROM, 0x00, 0x2000);
+    }
 }
 
 void NESDL_Mapper_0::SetMirroringData(bool data)

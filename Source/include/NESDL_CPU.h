@@ -49,6 +49,7 @@ public:
     bool delayNMI;
     bool dma;
     bool nextInstructionReady;
+    bool showCPULogs;
 private:
     void RunNextInstruction();
     void SetPSFlag(uint8_t flag, bool on);

@@ -25,7 +25,6 @@ void NESDL_PPU::Reset(bool hardReset)
     }
     registers.t = 0;
     registers.x = 0;
-    registers.y = 0;
     registers.w = false;
     
     tileFetch.nametable = 0;
@@ -123,10 +122,6 @@ void NESDL_PPU::HandleProcessVisibleScanline()
         }
     }
     
-    // There is one case where, since tile then sprite rendering occurs in that order, a sliver of sprite data can
-    // poke through tile despite giving tile priority. This check ensures that on this special cycle, that doesn't happen
-    bool bgPriorityThisCycle = false;
-    
     // TILE LOGIC - don't run if BG rendering is disabled
     if ((registers.mask & PPUMASK_BGENABLE) != 0x00)
     {
@@ -176,7 +171,7 @@ void NESDL_PPU::HandleProcessVisibleScanline()
                         frameData[currentPixel] = color;
                         if (patternBits != 0x00)
                         {
-                            bgPriorityThisCycle = true;
+                            frameDataSprite[currentPixel] = 0x80 | (frameDataSprite[currentPixel] & 0x7F);
                         }
                     }
                     currentDrawX++;
@@ -220,7 +215,7 @@ void NESDL_PPU::HandleProcessVisibleScanline()
                             frameData[currentPixel] = color;
                             if (patternBits != 0x00)
                             {
-                                bgPriorityThisCycle = true;
+                                frameDataSprite[currentPixel] = 0x80 | (frameDataSprite[currentPixel] & 0x7F);
                             }
                         }
                         currentDrawX++;
@@ -269,10 +264,8 @@ void NESDL_PPU::HandleProcessVisibleScanline()
         else if (currentScanlineCycle < 337)
         {
             // Run tile fetch for the next two tiles
-            // For logic out-of-order reasons(?), modify Y register
-            registers.y += 1;
             FetchAndStoreTile(pixelInFetchCycle);
-            registers.y -= 1;
+            
             if (pixelInFetchCycle == 7)
             {
 //                PPUTileFetch toRender = tileBuffer[1];
@@ -333,8 +326,12 @@ void NESDL_PPU::HandleProcessVisibleScanline()
                 // We only go further IFF the pixel to render isn't the backdrop index!
                 if (GetPatternBits(sprData.pattern, index) != 0x0)
                 {
+                    // Sprite 0 Hit
+                    bool leftSide = currentScanlineCycle < 8 && (registers.mask & (PPUMASK_BG_LCOL_ENABLE | PPUMASK_SPR_LCOL_ENABLE));
+                    bool lastRow = currentScanline == 255;
+                    bool spr0HitAlready = (registers.status & PPUSTATUS_SPR0HIT) != 0;
                     // If this is sprite zero, we haven't hit sprite 0 this frame yet, then mark that we rendered it at least one pixel!
-                    if (sprData.oamIndex == 0 && (registers.status & PPUSTATUS_SPR0HIT) == 0x00)
+                    if (sprData.oamIndex == 0 && !(leftSide || lastRow || spr0HitAlready))
                     {
                         registers.status |= PPUSTATUS_SPR0HIT;
                     }
@@ -352,14 +349,14 @@ void NESDL_PPU::HandleProcessVisibleScanline()
                     
                     if (sprData.bgPriority)
                     {
-                        frameDataSprite[currentPixel] = 0x80 | (frameDataSprite[currentPixel] & 0x7F);
-                        
                         // Skip if we also drew a tile on this cycle, before we set the priority data,
                         // but we know the tile sprite wasn't backdrop (aka the tile takes priority)
-                        if (bgPriorityThisCycle)
+                        if ((frameDataSprite[currentPixel] & 0x80) > 0)
                         {
                             continue;
                         }
+                        
+                        frameDataSprite[currentPixel] = 0x80 | (frameDataSprite[currentPixel] & 0x7F);
                     }
                     
                     // We finally get to draw the pixel!
@@ -556,7 +553,8 @@ void NESDL_PPU::FetchAndStoreTile(uint8_t pixelInFetchCycle)
         
         // Start with which pattern bank to read from
         uint16_t patternAddr = ((registers.ctrl & PPUCTRL_BGTILE) >> 4) * 0x100;
-        uint8_t rowIndex = (currentScanline + registers.y) % 8;
+        uint8_t fineY = ((registers.v & 0x7000) >> 12);
+        uint8_t rowIndex = fineY % 8;
         patternAddr = ((patternAddr + tileFetch.nametable) << 4) + rowIndex;
         
         uint8_t ptrnLow = ReadFromVRAM(patternAddr);
@@ -780,7 +778,6 @@ void NESDL_PPU::WriteToRegister(uint16_t registerAddr, uint8_t data)
                     (uint16_t(data) << 12) |
                     ((uint16_t(data) & 0xC0) << 2) |
                     ((uint16_t(data) & 0x38) << 2);
-                registers.y = data;
                 // t is not assigned to v as we cannot change scroll position mid-frame via PPUSCROLL
             }
             registers.w = !registers.w;
@@ -791,7 +788,7 @@ void NESDL_PPU::WriteToRegister(uint16_t registerAddr, uint8_t data)
             if (!registers.w)
             {
                 // High byte first (t bit 14 is set to 0, bit 15 is nonexistent on hardware)
-                registers.t = (registers.t & 0x00FF) | ((uint16_t(data) & 0x3F) << 8);
+                registers.t = (registers.t & 0x00FF) | (uint16_t(data & 0x3F) << 8);
             }
             else
             {

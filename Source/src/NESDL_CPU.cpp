@@ -75,9 +75,10 @@ void NESDL_CPU::Update(uint32_t ppuCycles)
                 }
             }
             
+            if (showCPULogs)
             {
                 // Debug Nintendulator format
-//                printf("\n%04X\t\t\t\t\t\t\t\t\t\t\tA:%02X X:%02X Y:%02X P:%02X SP:%02X PPU:%3d,%3d CYC:%llu", registers.pc, registers.a, registers.x, registers.y, registers.p, registers.sp, core->ppu->currentScanlineCycle, core->ppu->currentScanline, elapsedCycles);
+                printf("\n%04X\t\t\t\t\t\t\t\t\t\t\tA:%02X X:%02X Y:%02X P:%02X SP:%02X PPU:%3d,%3d CYC:%llu", registers.pc, registers.a, registers.x, registers.y, registers.p, registers.sp, core->ppu->currentScanlineCycle, core->ppu->currentScanline, elapsedCycles);
             }
             
             ppuCycleCounter -= nextInstructionPPUTime;

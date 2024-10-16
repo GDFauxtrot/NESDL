@@ -6,7 +6,6 @@ struct PPURegisters
     uint16_t v; // 15-bit register - current VRAM address
     uint16_t t; // 15-bit register - temp VRAM address (usually top-left screen tile)
     uint8_t x; // 3-bit register - fine X scroll
-    uint8_t y; // Technically not an internal register? Fine Y scroll
     bool w; // 1-bit register - write toggle
 
     // Memory-mapped registers

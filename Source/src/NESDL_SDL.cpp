@@ -167,8 +167,8 @@ void NESDL_SDL::UpdateScreen(double fps)
     }
     if (showPPU)
     {
-        const char* format = "CTRL: %02X\nMASK: %02X\nSTAT: %02X\nOAM: %02X\nPPU: %04X\nLine: %d\nPos: %d\nX: %d\nY: %d";
-        string s = string_format(format, core->ppu->registers.ctrl, core->ppu->registers.mask, core->ppu->registers.status, core->ppu->registers.oamAddr, core->ppu->registers.v, core->ppu->currentScanline, core->ppu->currentScanlineCycle, core->ppu->registers.x, core->ppu->registers.y);
+        const char* format = "CTRL: %02X\nMASK: %02X\nSTAT: %02X\nOAM: %02X\nPPU: %04X\nLine: %d\nPos: %d\nX: %d";
+        string s = string_format(format, core->ppu->registers.ctrl, core->ppu->registers.mask, core->ppu->registers.status, core->ppu->registers.oamAddr, core->ppu->registers.v, core->ppu->currentScanline, core->ppu->currentScanlineCycle, core->ppu->registers.x);
         SetScreenTextText("ppu", s.c_str());
         if (showCPU)
         {
