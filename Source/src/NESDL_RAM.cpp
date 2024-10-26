@@ -32,7 +32,7 @@ uint8_t NESDL_RAM::ReadByte(uint16_t addr)
         bool isPlayer2 = addr == 0x4017;
         // High 3 (or 5?) bytes are open bus, usually containing the upper byte of the controller address
         // (aka 0x40). Needed for Paperboy as it expects this open bus data, according to NESDEV
-        return 0x40 | core->input->GetNextPlayerInputBit(isPlayer2);
+        return 0x40 | (uint8_t)core->input->GetNextPlayerInputBit(isPlayer2);
     }
     // APU test functionality + some unfinished hardware functionality (do nothing)
     else if (addr < 0x4020)

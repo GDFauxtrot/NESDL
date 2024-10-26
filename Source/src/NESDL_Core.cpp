@@ -1,7 +1,11 @@
 #include "NESDL.h"
 #include <memory>
 #include <fstream>
+#ifdef _WIN32
+#include "../src/nfd/nfd.h"
+#else
 #include "nfd.h"
+#endif
 
 void NESDL_Core::Init(NESDL_SDL* sdl)
 {
@@ -28,9 +32,9 @@ void NESDL_Core::Init(NESDL_SDL* sdl)
 void NESDL_Core::Update(double deltaTime)
 {
 	// Convert deltaTime to the amount of cycles we need to advance on this frame
-    uint64_t ppuTiming1 = (NESDL_PPU_CLOCK / 1000) * timeSinceStartup;
+    uint64_t ppuTiming1 = (uint64_t)((NESDL_PPU_CLOCK / 1000) * timeSinceStartup);
 	timeSinceStartup += deltaTime;
-    uint64_t ppuTiming2 = (NESDL_PPU_CLOCK / 1000) * timeSinceStartup;
+    uint64_t ppuTiming2 = (uint64_t)((NESDL_PPU_CLOCK / 1000) * timeSinceStartup);
     uint32_t ppuCycles = (uint32_t)(ppuTiming2 - ppuTiming1);
     
     // Force 0 cycles if we're paused, or just 1 if we want to step the PPU.
@@ -172,7 +176,10 @@ void NESDL_Core::LoadROM(const char* path)
 
 void NESDL_Core::HandleEvent(SDL_EventType eventType, SDL_KeyCode eventKeyCode)
 {
-    input->RegisterKey(eventKeyCode, eventType == SDL_KEYDOWN);
+    if (eventType == SDL_KEYUP || eventType == SDL_KEYDOWN)
+    {
+        input->RegisterKey(eventKeyCode, eventType == SDL_KEYDOWN);
+    }
 }
 
 bool NESDL_Core::IsROMLoaded()

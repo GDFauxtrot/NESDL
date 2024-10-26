@@ -45,9 +45,9 @@ void NESDL_SDL::SDLInit()
     // Initialize SDL audio
     SDL_AudioSpec spec =
     {
+        .freq = APU_SAMPLE_RATE,
         .format = AUDIO_F32,
         .channels = 1,
-        .freq = APU_SAMPLE_RATE,
         .samples = APU_SAMPLE_BUF,
         .callback = NULL,
         .userdata = this
@@ -216,20 +216,20 @@ void NESDL_SDL::UpdateScreen(double fps)
                 SDL_Color bgColor = value->backgroundFrameColor;
                 SDL_SetRenderDrawColor(renderer, bgColor.r, bgColor.g, bgColor.b, bgColor.a);
                 int pad = value->backgroundPadding;
-                int x = (value->x-pad) * winMulX;
-                int y = (value->y-pad) * winMulY;
-                int w = (value->width+pad*2) * winMulX;
-                int h = (value->height+pad*2) * winMulY;
+                int x = (int)((value->x - pad) * winMulX);
+                int y = (int)((value->y - pad) * winMulY);
+                int w = (int)((value->width + pad * 2) * winMulX);
+                int h = (int)((value->height + pad * 2) * winMulY);
                 SDL_Rect backgroundRect = { x, y, w, h };
                 SDL_RenderFillRect(renderer, &backgroundRect); // Background fill render
                 SDL_RenderDrawRect(renderer, &backgroundRect); // Background border render
             }
             if (value->texture != nullptr)
             {
-                int x = value->x * winMulX;
-                int y = value->y * winMulY;
-                int w = value->width * winMulX;
-                int h = value->height * winMulY;
+                int x = (int)(value->x * winMulX);
+                int y = (int)(value->y * winMulY);
+                int w = (int)(value->width * winMulX);
+                int h = (int)(value->height * winMulY);
                 SDL_Rect renderRect = { x, y, w, h };
                 SDL_RenderCopy(renderer, value->texture, nullptr, &renderRect); // Text render
             }

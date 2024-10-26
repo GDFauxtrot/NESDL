@@ -19,6 +19,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Source\include\mappers\NESDL_Mapper.h" />
     <ClInclude Include="Source\include\NESDL.h" />
     <ClInclude Include="Source\include\NESDL_APU.h" />
     <ClInclude Include="Source\include\NESDL_Constants.h" />
@@ -28,8 +29,14 @@
     <ClInclude Include="Source\include\NESDL_PPU.h" />
     <ClInclude Include="Source\include\NESDL_RAM.h" />
     <ClInclude Include="Source\include\NESDL_SDL.h" />
+    <ClInclude Include="Source\src\nfd\common.h" />
+    <ClInclude Include="Source\src\nfd\nfd.h" />
+    <ClInclude Include="Source\src\nfd\nfd_common.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Source\src\mappers\NESDL_Mapper_0.cpp" />
+    <ClCompile Include="Source\src\mappers\NESDL_Mapper_1.cpp" />
+    <ClCompile Include="Source\src\mappers\NESDL_Mapper_9.cpp" />
     <ClCompile Include="Source\src\NESDL.cpp" />
     <ClCompile Include="Source\src\NESDL_APU.cpp" />
     <ClCompile Include="Source\src\NESDL_Core.cpp" />
@@ -38,6 +45,8 @@
     <ClCompile Include="Source\src\NESDL_PPU.cpp" />
     <ClCompile Include="Source\src\NESDL_RAM.cpp" />
     <ClCompile Include="Source\src\NESDL_SDL.cpp" />
+    <ClCompile Include="Source\src\nfd\nfd_common.c" />
+    <ClCompile Include="Source\src\nfd\nfd_win.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
@@ -92,21 +101,22 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>$(ProjectDir)Source\include;C:\vclib\SDL2-2.30.6\include;$(IncludePath)</IncludePath>
-    <LibraryPath>C:\vclib\SDL2-2.30.6\lib\x64;$(LibraryPath)</LibraryPath>
-    <SourcePath>$(ProjectDir)Source\src;$(SourcePath)</SourcePath>
+    <IncludePath>C:\vclib\SDL2-2.30.6\include;C:\vclib\SDL2_ttf-2.22.0\include;$(ProjectDir)Source\include;$(ProjectDir)Source\include\mappers;$(ProjectDir)Source\src\nfd;$(IncludePath)</IncludePath>
+    <LibraryPath>C:\vclib\SDL2-2.30.6\lib\x64;C:\vclib\SDL2_ttf-2.22.0\lib\x64;$(LibraryPath)</LibraryPath>
+    <SourcePath>$(ProjectDir)Source\src;$(ProjectDir)Source\src\mappers;$(ProjectDir)Source\src\nfd;$(SourcePath)</SourcePath>
     <AllProjectIncludesArePublic>false</AllProjectIncludesArePublic>
+    <AllProjectBMIsArePublic>false</AllProjectBMIsArePublic>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IncludePath>$(ProjectDir)Source\include;C:\vclib\SDL2-2.30.6\include;$(IncludePath)</IncludePath>
-    <LibraryPath>C:\vclib\SDL2-2.30.6\lib\x64;$(LibraryPath)</LibraryPath>
-    <SourcePath>$(ProjectDir)Source\src;$(SourcePath)</SourcePath>
+    <IncludePath>C:\vclib\SDL2-2.30.6\include;C:\vclib\SDL2_ttf-2.22.0\include;$(ProjectDir)Source\include;$(ProjectDir)Source\include\mappers;$(ProjectDir)Source\src\nfd;$(IncludePath)</IncludePath>
+    <LibraryPath>C:\vclib\SDL2-2.30.6\lib\x64;C:\vclib\SDL2_ttf-2.22.0\lib\x64;$(LibraryPath)</LibraryPath>
+    <SourcePath>$(ProjectDir)Source\src;$(ProjectDir)Source\src\mappers;$(ProjectDir)Source\src\nfd;$(SourcePath)</SourcePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_NONSTDC_NO_WARNINGS</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
     </ClCompile>
     <Link>
@@ -120,7 +130,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_NONSTDC_NO_WARNINGS</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
     </ClCompile>
     <Link>
@@ -134,13 +144,14 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>SDL2.lib;SDL2main.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>SDL2.lib;SDL2main.lib;SDL2_ttf.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -149,15 +160,16 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>SDL2.lib;SDL2main.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>SDL2.lib;SDL2main.lib;SDL2_ttf.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

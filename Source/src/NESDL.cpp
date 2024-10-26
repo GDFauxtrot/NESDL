@@ -1,10 +1,5 @@
 #include "NESDL.h"
 
-#ifdef __APPLE__
-#endif
-#ifdef _WIN32
-#endif
-
 // https://stackoverflow.com/questions/427477/fastest-way-to-clamp-a-real-fixed-floating-point-value
 double clamp(double d, double min, double max) {
   const double t = d < min ? min : d;
@@ -101,10 +96,25 @@ int main(int argc, char* args[])
         
 //        printf("\n%llu %llu (%f fps)", core->ppu->currentFrame, core->cpu->elapsedCycles, (1000/deltaTime));
         
-        // Cap frame rate to 60 for the application at all times
+        // Cap frame rate to 60 for the application at all times (not fully necessary, but helps with CPU usage)
         uint64_t end = SDL_GetPerformanceCounter();
         double ms = (end - start) / (double)freq * 1000.0;
-        SDL_Delay(floor(16.6666 - ms));
+#ifdef _WIN32
+        // Spinlock solution (more accurate, less fluctual but worse perf)
+        /*
+        int64_t remainder = (1/60.0 * freq) - (end - start);
+        uint64_t goal = end + remainder;
+        if (remainder > 0)
+        {
+            // Busy wait, but provides most accurate results
+            while (SDL_GetPerformanceCounter() < goal) {}
+        }
+        */
+        SDL_Delay((uint32_t) max(floor(16.6666 - ms), 0)); // Takes whole ms, we'd rather wait less MS than more
+#else
+        SDL_Delay((uint32_t) max(floor(16.6666 - ms), 0)); // Takes whole ms, we'd rather wait less MS than more
+        // Can we get a more granular timer?
+#endif
     }
 
     sdlCtx->SDLQuit();

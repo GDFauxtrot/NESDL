@@ -76,7 +76,7 @@ uint8_t NESDL_Input::PlayerInputToByte(bool isPlayer2)
     
     if (player.connected)
     {
-        result |= player.a;
+        result |= (player.a         << 0);
         result |= (player.b         << 1);
         result |= (player.select    << 2);
         result |= (player.start     << 3);

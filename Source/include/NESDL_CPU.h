@@ -23,8 +23,8 @@ struct CPURegisters
 #define STACK_PTR 0x0100
 
 // Bit masks for instruction addressing modes
-enum AddrMode { IMPLICIT, RELATIVE, ACCUMULATOR, IMMEDIATE,
-    ZEROPAGE, ZEROPAGEX, ZEROPAGEY, ABSOLUTE, ABSOLUTEX, ABSOLUTEY,
+enum AddrMode { IMPLICIT, RELATIVEADDR, ACCUMULATOR, IMMEDIATE,
+    ZEROPAGE, ZEROPAGEX, ZEROPAGEY, ABSOLUTEADDR, ABSOLUTEADDRX, ABSOLUTEADDRY,
     INDIRECTX, INDIRECTY };
 
 struct AddressModeResult
@@ -122,6 +122,7 @@ private:
 	NESDL_Core* core;
     AddressModeResult* addrModeResult;
     int16_t ppuCycleCounter;
+    uint8_t nextInstructionPPUCycles;
     
     bool didMapperWrite;
     bool wasLastInstructionAMapperWrite; // Not happy with this, but needed

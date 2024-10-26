@@ -35,12 +35,13 @@ void NESDL_CPU::Reset(bool hardReset)
     ppuCycleCounter = 0;
     registers.pc = core->ram->ReadWord(registers.pc);
     elapsedCycles += 7;
+
+    // Get how long our next (first) instruction will take
+    nextInstructionPPUCycles = GetCyclesForNextInstruction() * 3;
 }
 
 void NESDL_CPU::Update(uint32_t ppuCycles)
 {
-    uint8_t nextInstructionPPUTime = GetCyclesForNextInstruction() * 3;
-    
     while (ppuCycleCounter >= 0)
     {
         // Handle NMI
@@ -71,7 +72,7 @@ void NESDL_CPU::Update(uint32_t ppuCycles)
                 uint16_t addr = 0x2000 + (addrModeResult->address % 0x8);
                 if (addr == PPU_PPUSTATUS)
                 {
-                    core->ppu->PreprocessPPUForReadInstructionTiming(nextInstructionPPUTime);
+                    core->ppu->PreprocessPPUForReadInstructionTiming(nextInstructionPPUCycles);
                 }
             }
             
@@ -81,8 +82,11 @@ void NESDL_CPU::Update(uint32_t ppuCycles)
                 printf("\n%04X\t\t\t\t\t\t\t\t\t\t\tA:%02X X:%02X Y:%02X P:%02X SP:%02X PPU:%3d,%3d CYC:%llu", registers.pc, registers.a, registers.x, registers.y, registers.p, registers.sp, core->ppu->currentScanlineCycle, core->ppu->currentScanline, elapsedCycles);
             }
             
-            ppuCycleCounter -= nextInstructionPPUTime;
+            ppuCycleCounter -= nextInstructionPPUCycles;
             RunNextInstruction();
+
+            // Figure out how long our new next instruction will take
+            nextInstructionPPUCycles = GetCyclesForNextInstruction() * 3;
             
             wasLastInstructionAMapperWrite = didMapperWrite;
             didMapperWrite = false;
@@ -112,7 +116,7 @@ uint8_t NESDL_CPU::GetCyclesForNextInstruction()
     core->ram->ignoreChanges = false;
     core->input->ignoreChanges = false;
     registers = regState;
-    uint8_t result = elapsedCycles - prevElapsedCycles;
+    uint8_t result = (uint8_t)(elapsedCycles - prevElapsedCycles); // No cycle counting ever goes above 255
     elapsedCycles = prevElapsedCycles;
     return result;
 }
@@ -146,13 +150,13 @@ void NESDL_CPU::RunNextInstruction()
             OP_ASL(opcode, AddrMode::ACCUMULATOR);
             break;
         case 0x0D:
-            OP_ORA(opcode, AddrMode::ABSOLUTE);
+            OP_ORA(opcode, AddrMode::ABSOLUTEADDR);
             break;
         case 0x0E:
-            OP_ASL(opcode, AddrMode::ABSOLUTE);
+            OP_ASL(opcode, AddrMode::ABSOLUTEADDR);
             break;
         case 0x10:
-            OP_BPL(opcode, AddrMode::RELATIVE);
+            OP_BPL(opcode, AddrMode::RELATIVEADDR);
             break;
         case 0x11:
             OP_ORA(opcode, AddrMode::INDIRECTY);
@@ -167,16 +171,16 @@ void NESDL_CPU::RunNextInstruction()
             OP_CLC(opcode, AddrMode::IMPLICIT);
             break;
         case 0x19:
-            OP_ORA(opcode, AddrMode::ABSOLUTEY);
+            OP_ORA(opcode, AddrMode::ABSOLUTEADDRY);
             break;
         case 0x1D:
-            OP_ORA(opcode, AddrMode::ABSOLUTEX);
+            OP_ORA(opcode, AddrMode::ABSOLUTEADDRX);
             break;
         case 0x1E:
-            OP_ASL(opcode, AddrMode::ABSOLUTEX);
+            OP_ASL(opcode, AddrMode::ABSOLUTEADDRX);
             break;
         case 0x20:
-            OP_JSR(opcode, AddrMode::ABSOLUTE);
+            OP_JSR(opcode, AddrMode::ABSOLUTEADDR);
             break;
         case 0x21:
             OP_AND(opcode, AddrMode::INDIRECTX);
@@ -200,16 +204,16 @@ void NESDL_CPU::RunNextInstruction()
             OP_ROL(opcode, AddrMode::ACCUMULATOR);
             break;
         case 0x2C:
-            OP_BIT(opcode, AddrMode::ABSOLUTE);
+            OP_BIT(opcode, AddrMode::ABSOLUTEADDR);
             break;
         case 0x2D:
-            OP_AND(opcode, AddrMode::ABSOLUTE);
+            OP_AND(opcode, AddrMode::ABSOLUTEADDR);
             break;
         case 0x2E:
-            OP_ROL(opcode, AddrMode::ABSOLUTE);
+            OP_ROL(opcode, AddrMode::ABSOLUTEADDR);
             break;
         case 0x30:
-            OP_BMI(opcode, AddrMode::RELATIVE);
+            OP_BMI(opcode, AddrMode::RELATIVEADDR);
             break;
         case 0x31:
             OP_AND(opcode, AddrMode::INDIRECTY);
@@ -224,13 +228,13 @@ void NESDL_CPU::RunNextInstruction()
             OP_SEC(opcode, AddrMode::IMPLICIT);
             break;
         case 0x39:
-            OP_AND(opcode, AddrMode::ABSOLUTEY);
+            OP_AND(opcode, AddrMode::ABSOLUTEADDRY);
             break;
         case 0x3D:
-            OP_AND(opcode, AddrMode::ABSOLUTEX);
+            OP_AND(opcode, AddrMode::ABSOLUTEADDRX);
             break;
         case 0x3E:
-            OP_ROL(opcode, AddrMode::ABSOLUTEX);
+            OP_ROL(opcode, AddrMode::ABSOLUTEADDRX);
             break;
         case 0x40:
             OP_RTI(opcode, AddrMode::IMPLICIT);
@@ -257,13 +261,13 @@ void NESDL_CPU::RunNextInstruction()
             OP_JMP(opcode, false);
             break;
         case 0x4D:
-            OP_EOR(opcode, AddrMode::ABSOLUTE);
+            OP_EOR(opcode, AddrMode::ABSOLUTEADDR);
             break;
         case 0x4E:
-            OP_LSR(opcode, AddrMode::ABSOLUTE);
+            OP_LSR(opcode, AddrMode::ABSOLUTEADDR);
             break;
         case 0x50:
-            OP_BVC(opcode, AddrMode::RELATIVE);
+            OP_BVC(opcode, AddrMode::RELATIVEADDR);
             break;
         case 0x51:
             OP_EOR(opcode, AddrMode::INDIRECTY);
@@ -278,13 +282,13 @@ void NESDL_CPU::RunNextInstruction()
             OP_CLI(opcode, AddrMode::IMPLICIT);
             break;
         case 0x59:
-            OP_EOR(opcode, AddrMode::ABSOLUTEY);
+            OP_EOR(opcode, AddrMode::ABSOLUTEADDRY);
             break;
         case 0x5D:
-            OP_EOR(opcode, AddrMode::ABSOLUTEX);
+            OP_EOR(opcode, AddrMode::ABSOLUTEADDRX);
             break;
         case 0x5E:
-            OP_LSR(opcode, AddrMode::ABSOLUTEX);
+            OP_LSR(opcode, AddrMode::ABSOLUTEADDRX);
             break;
         case 0x60:
             OP_RTS(opcode, AddrMode::IMPLICIT);
@@ -311,13 +315,13 @@ void NESDL_CPU::RunNextInstruction()
             OP_JMP(opcode, true);
             break;
         case 0x6D:
-            OP_ADC(opcode, AddrMode::ABSOLUTE, false);
+            OP_ADC(opcode, AddrMode::ABSOLUTEADDR, false);
             break;
         case 0x6E:
-            OP_ROR(opcode, AddrMode::ABSOLUTE);
+            OP_ROR(opcode, AddrMode::ABSOLUTEADDR);
             break;
         case 0x70:
-            OP_BVS(opcode, AddrMode::RELATIVE);
+            OP_BVS(opcode, AddrMode::RELATIVEADDR);
             break;
         case 0x71:
             OP_ADC(opcode, AddrMode::INDIRECTY, false);
@@ -332,13 +336,13 @@ void NESDL_CPU::RunNextInstruction()
             OP_SEI(opcode, AddrMode::IMPLICIT);
             break;
         case 0x79:
-            OP_ADC(opcode, AddrMode::ABSOLUTEY, false);
+            OP_ADC(opcode, AddrMode::ABSOLUTEADDRY, false);
             break;
         case 0x7D:
-            OP_ADC(opcode, AddrMode::ABSOLUTEX, false);
+            OP_ADC(opcode, AddrMode::ABSOLUTEADDRX, false);
             break;
         case 0x7E:
-            OP_ROR(opcode, AddrMode::ABSOLUTEX);
+            OP_ROR(opcode, AddrMode::ABSOLUTEADDRX);
             break;
         case 0x81:
             OP_STA(opcode, AddrMode::INDIRECTX);
@@ -359,16 +363,16 @@ void NESDL_CPU::RunNextInstruction()
             OP_TXA(opcode, AddrMode::IMPLICIT);
             break;
         case 0x8C:
-            OP_STY(opcode, AddrMode::ABSOLUTE);
+            OP_STY(opcode, AddrMode::ABSOLUTEADDR);
             break;
         case 0x8D:
-            OP_STA(opcode, AddrMode::ABSOLUTE);
+            OP_STA(opcode, AddrMode::ABSOLUTEADDR);
             break;
         case 0x8E:
-            OP_STX(opcode, AddrMode::ABSOLUTE);
+            OP_STX(opcode, AddrMode::ABSOLUTEADDR);
             break;
         case 0x90:
-            OP_BCC(opcode, AddrMode::RELATIVE);
+            OP_BCC(opcode, AddrMode::RELATIVEADDR);
             break;
         case 0x91:
             OP_STA(opcode, AddrMode::INDIRECTY);
@@ -386,13 +390,13 @@ void NESDL_CPU::RunNextInstruction()
             OP_TYA(opcode, AddrMode::IMPLICIT);
             break;
         case 0x99:
-            OP_STA(opcode, AddrMode::ABSOLUTEY);
+            OP_STA(opcode, AddrMode::ABSOLUTEADDRY);
             break;
         case 0x9A:
             OP_TXS(opcode, AddrMode::IMPLICIT);
             break;
         case 0x9D:
-            OP_STA(opcode, AddrMode::ABSOLUTEX);
+            OP_STA(opcode, AddrMode::ABSOLUTEADDRX);
             break;
         case 0xA0:
             OP_LDY(opcode, AddrMode::IMMEDIATE);
@@ -422,16 +426,16 @@ void NESDL_CPU::RunNextInstruction()
             OP_TAX(opcode, AddrMode::IMPLICIT);
             break;
         case 0xAC:
-            OP_LDY(opcode, AddrMode::ABSOLUTE);
+            OP_LDY(opcode, AddrMode::ABSOLUTEADDR);
             break;
         case 0xAD:
-            OP_LDA(opcode, AddrMode::ABSOLUTE);
+            OP_LDA(opcode, AddrMode::ABSOLUTEADDR);
             break;
         case 0xAE:
-            OP_LDX(opcode, AddrMode::ABSOLUTE);
+            OP_LDX(opcode, AddrMode::ABSOLUTEADDR);
             break;
         case 0xB0:
-            OP_BCS(opcode, AddrMode::RELATIVE);
+            OP_BCS(opcode, AddrMode::RELATIVEADDR);
             break;
         case 0xB1:
             OP_LDA(opcode, AddrMode::INDIRECTY);
@@ -449,19 +453,19 @@ void NESDL_CPU::RunNextInstruction()
             OP_CLV(opcode, AddrMode::IMPLICIT);
             break;
         case 0xB9:
-            OP_LDA(opcode, AddrMode::ABSOLUTEY);
+            OP_LDA(opcode, AddrMode::ABSOLUTEADDRY);
             break;
         case 0xBA:
             OP_TSX(opcode, AddrMode::IMPLICIT);
             break;
         case 0xBC:
-            OP_LDY(opcode, AddrMode::ABSOLUTEX);
+            OP_LDY(opcode, AddrMode::ABSOLUTEADDRX);
             break;
         case 0xBD:
-            OP_LDA(opcode, AddrMode::ABSOLUTEX);
+            OP_LDA(opcode, AddrMode::ABSOLUTEADDRX);
             break;
         case 0xBE:
-            OP_LDX(opcode, AddrMode::ABSOLUTEY);
+            OP_LDX(opcode, AddrMode::ABSOLUTEADDRY);
             break;
         case 0xC0:
             OP_CPY(opcode, AddrMode::IMMEDIATE);
@@ -488,16 +492,16 @@ void NESDL_CPU::RunNextInstruction()
             OP_DEX(opcode, AddrMode::IMPLICIT);
             break;
         case 0xCC:
-            OP_CPY(opcode, AddrMode::ABSOLUTE);
+            OP_CPY(opcode, AddrMode::ABSOLUTEADDR);
             break;
         case 0xCD:
-            OP_CMP(opcode, AddrMode::ABSOLUTE);
+            OP_CMP(opcode, AddrMode::ABSOLUTEADDR);
             break;
         case 0xCE:
-            OP_DEC(opcode, AddrMode::ABSOLUTE);
+            OP_DEC(opcode, AddrMode::ABSOLUTEADDR);
             break;
         case 0xD0:
-            OP_BNE(opcode, AddrMode::RELATIVE);
+            OP_BNE(opcode, AddrMode::RELATIVEADDR);
             break;
         case 0xD1:
             OP_CMP(opcode, AddrMode::INDIRECTY);
@@ -512,13 +516,13 @@ void NESDL_CPU::RunNextInstruction()
             OP_CLD(opcode, AddrMode::IMPLICIT);
             break;
         case 0xD9:
-            OP_CMP(opcode, AddrMode::ABSOLUTEY);
+            OP_CMP(opcode, AddrMode::ABSOLUTEADDRY);
             break;
         case 0xDD:
-            OP_CMP(opcode, AddrMode::ABSOLUTEX);
+            OP_CMP(opcode, AddrMode::ABSOLUTEADDRX);
             break;
         case 0xDE:
-            OP_DEC(opcode, AddrMode::ABSOLUTEX);
+            OP_DEC(opcode, AddrMode::ABSOLUTEADDRX);
             break;
         case 0xE0:
             OP_CPX(opcode, AddrMode::IMMEDIATE);
@@ -542,16 +546,16 @@ void NESDL_CPU::RunNextInstruction()
             OP_SBC(opcode, AddrMode::IMMEDIATE);
             break;
         case 0xEC:
-            OP_CPX(opcode, AddrMode::ABSOLUTE);
+            OP_CPX(opcode, AddrMode::ABSOLUTEADDR);
             break;
         case 0xED:
-            OP_SBC(opcode, AddrMode::ABSOLUTE);
+            OP_SBC(opcode, AddrMode::ABSOLUTEADDR);
             break;
         case 0xEE:
-            OP_INC(opcode, AddrMode::ABSOLUTE);
+            OP_INC(opcode, AddrMode::ABSOLUTEADDR);
             break;
         case 0xF0:
-            OP_BEQ(opcode, AddrMode::RELATIVE);
+            OP_BEQ(opcode, AddrMode::RELATIVEADDR);
             break;
         case 0xF1:
             OP_SBC(opcode, AddrMode::INDIRECTY);
@@ -566,13 +570,13 @@ void NESDL_CPU::RunNextInstruction()
             OP_SED(opcode, AddrMode::IMPLICIT);
             break;
         case 0xF9:
-            OP_SBC(opcode, AddrMode::ABSOLUTEY);
+            OP_SBC(opcode, AddrMode::ABSOLUTEADDRY);
             break;
         case 0xFD:
-            OP_SBC(opcode, AddrMode::ABSOLUTEX);
+            OP_SBC(opcode, AddrMode::ABSOLUTEADDRX);
             break;
         case 0xFE:
-            OP_INC(opcode, AddrMode::ABSOLUTEX);
+            OP_INC(opcode, AddrMode::ABSOLUTEADDRX);
             break;
         case 0x80:
         case 0x82:
@@ -641,7 +645,7 @@ void NESDL_CPU::GetByteForAddressMode(AddrMode mode, AddressModeResult* result)
         case AddrMode::ACCUMULATOR:
             // Do nothing
             break;
-        case AddrMode::RELATIVE:
+        case AddrMode::RELATIVEADDR:
         case AddrMode::IMMEDIATE:
             result->value = core->ram->ReadByte(registers.pc++);
             result->address = 0;
@@ -669,7 +673,7 @@ void NESDL_CPU::GetByteForAddressMode(AddrMode mode, AddressModeResult* result)
             result->address = addr;
             break;
         }
-        case AddrMode::ABSOLUTE:
+        case AddrMode::ABSOLUTEADDR:
         {
             uint16_t addr = core->ram->ReadWord(registers.pc);
             result->value = core->ram->ReadByte(addr);
@@ -677,7 +681,7 @@ void NESDL_CPU::GetByteForAddressMode(AddrMode mode, AddressModeResult* result)
             result->address = addr;
             break;
         }
-        case AddrMode::ABSOLUTEX:
+        case AddrMode::ABSOLUTEADDRX:
         {
             uint16_t addr = core->ram->ReadWord(registers.pc);
             // Trigger an "oops" if this mode crossed page bounds
@@ -688,7 +692,7 @@ void NESDL_CPU::GetByteForAddressMode(AddrMode mode, AddressModeResult* result)
             result->address = addr;
             break;
         }
-        case AddrMode::ABSOLUTEY:
+        case AddrMode::ABSOLUTEADDRY:
         {
             uint16_t addr = core->ram->ReadWord(registers.pc);
             // Trigger an "oops" if this mode crossed page bounds
@@ -769,16 +773,16 @@ void NESDL_CPU::AdvanceCyclesForAddressMode(uint8_t opcode, AddrMode mode, bool 
         case ZEROPAGEY:
             elapsedCycles += 4 + (extraCycles ? 2 : 0);
             break;
-        case ABSOLUTE:
+        case ABSOLUTEADDR:
             elapsedCycles += 4 + (extraCycles ? 2 : 0); // One exception being JMP (3/5 cycles)
             break;
-        case ABSOLUTEX:
+        case ABSOLUTEADDRX:
             elapsedCycles += 4 + (extraCycles ? 3 : pageCross);
             break;
-        case ABSOLUTEY:
+        case ABSOLUTEADDRY:
             elapsedCycles += 4 + pageCross;
             break;
-        case RELATIVE:
+        case RELATIVEADDR:
             elapsedCycles += 2 + pageCross + relSuccess;
             break;
         case ACCUMULATOR:
@@ -997,7 +1001,7 @@ void NESDL_CPU::OP_BRK(uint8_t opcode, AddrMode mode)
 {
     // Push PC onto stack in two bytes (high then low since we're going backwards)
     core->ram->WriteByte(STACK_PTR + (registers.sp--), (registers.pc >> 8));
-    core->ram->WriteByte(STACK_PTR + (registers.sp--), registers.pc);
+    core->ram->WriteByte(STACK_PTR + (registers.sp--), (uint8_t)registers.pc);
     // Push P onto stack
     core->ram->WriteByte(STACK_PTR + (registers.sp--), registers.p);
     // Read interrupt vector from FFFE/F into PC
@@ -1198,7 +1202,7 @@ void NESDL_CPU::OP_JMP(uint8_t opcode, bool indirect)
         {
             addr = core->ram->ReadWord(addr);
         }
-        AdvanceCyclesForAddressMode(opcode, AddrMode::ABSOLUTE, false, false, false);
+        AdvanceCyclesForAddressMode(opcode, AddrMode::ABSOLUTEADDR, false, false, false);
     }
     else
     {
@@ -1223,7 +1227,7 @@ void NESDL_CPU::OP_JSR(uint8_t opcode, AddrMode mode)
     
     // Push this PC onto the stack to return to later
     core->ram->WriteByte(STACK_PTR + (registers.sp--), (registers.pc >> 8));
-    core->ram->WriteByte(STACK_PTR + (registers.sp--), registers.pc);
+    core->ram->WriteByte(STACK_PTR + (registers.sp--), (uint8_t)registers.pc);
     
     // Overwrite the PC with the address
     registers.pc = addr;
@@ -1533,7 +1537,7 @@ void NESDL_CPU::NMI()
 {
     // Push PC to stack
     core->ram->WriteByte(STACK_PTR + (registers.sp--), (registers.pc >> 8));
-    core->ram->WriteByte(STACK_PTR + (registers.sp--), registers.pc);
+    core->ram->WriteByte(STACK_PTR + (registers.sp--), (uint8_t)registers.pc);
     
     // Set break flag (before pushing P to stack)
     SetPSFlag(PSTATUS_BREAK, false);

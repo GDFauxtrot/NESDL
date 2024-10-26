@@ -245,10 +245,10 @@ void NESDL_APU::Update(uint32_t ppuCycles)
         uint8_t s1Index = counters.square1WaveIndex;
         uint8_t s2Index = counters.square2WaveIndex;
         uint8_t triIndex = counters.triWaveIndex;
-        float s1 = (NESDL_SQUARE_DUTY[s1Duty*8 + s1Index] ? 15.0 : 0.0);
-        float s2 = (NESDL_SQUARE_DUTY[s2Duty*8 + s2Index] ? 15.0 : 0.0);
+        float s1 = (NESDL_SQUARE_DUTY[s1Duty*8 + s1Index] ? 15.0f : 0.0f);
+        float s2 = (NESDL_SQUARE_DUTY[s2Duty*8 + s2Index] ? 15.0f : 0.0f);
         float t = NESDL_TRI_DUTY[triIndex];
-        float n = (counters.noiseLFSR & 0x01) ? 15.0 : 0.0;
+        float n = (counters.noiseLFSR & 0x01) ? 15.0f : 0.0f;
         float d = counters.dmcOutputSample;
         
         // Multiply channels by their volume
@@ -281,26 +281,26 @@ void NESDL_APU::Update(uint32_t ppuCycles)
         }
         
         // Silence channels if length counter is 0 (or muted via status)
-        s1 *= (counters.square1Length > 0) && (status.square1Enable) ? 1.0 : 0.0;
-        s2 *= (counters.square2Length > 0) && (status.square2Enable) ? 1.0 : 0.0;
-        t *= (counters.triLength > 0) && (counters.triLinearCounter > 0) && (status.triEnable) ? 1.0 : 0.0;
-        n *= (counters.noiseLength > 0) && (status.noiseEnable) ? 1.0 : 0.0;
+        s1 *= (counters.square1Length > 0) && (status.square1Enable) ? 1.0f : 0.0f;
+        s2 *= (counters.square2Length > 0) && (status.square2Enable) ? 1.0f : 0.0f;
+        t *= (counters.triLength > 0) && (counters.triLinearCounter > 0) && (status.triEnable) ? 1.0f : 0.0f;
+        n *= (counters.noiseLength > 0) && (status.noiseEnable) ? 1.0f : 0.0f;
         
         // For Square channels - also silence if sweep goes overboard
-        s1 *= IsSweepMuted(1) ? 0.0 : 1.0;
-        s2 *= IsSweepMuted(2) ? 0.0 : 1.0;
+        s1 *= IsSweepMuted(1) ? 0.0f : 1.0f;
+        s2 *= IsSweepMuted(2) ? 0.0f : 1.0f;
         
         // Mix channels together!
         // https://www.nesdev.org/wiki/APU_Mixer
         float pulseOut = 0;
         if (s1 > 0 || s2 > 0)
         {
-            pulseOut = 95.88 / (((float)8128 / (s1 + s2)) + 100);
+            pulseOut = 95.88f / (((float)8128 / (s1 + s2)) + 100);
         }
         float tndOut = 0;
         if (t > 0 || n > 0 || d > 0)
         {
-            tndOut = 159.79 / (((float)1 / ((t/8227) + (n/12241) + (d/22638))) + 100);
+            tndOut = 159.79f / (((float)1 / ((t/8227) + (n/12241) + (d/22638))) + 100);
         }
         float output = pulseOut + tndOut;
         
@@ -567,7 +567,7 @@ uint8_t NESDL_APU::ReadByte(uint16_t addr)
         status.frameInterrupt = false;
         return (status.dmcInterrupt << 7) | (interruptVal << 6) |
             (status.dmcEnable << 4) | (status.noiseEnable << 3) |
-            (status.triEnable << 2) | (status.square2Enable << 1) | status.square1Enable;
+            (status.triEnable << 2) | (status.square2Enable << 1) | (status.square1Enable << 0);
     }
     return 0;
 }
@@ -676,7 +676,7 @@ void NESDL_APU::WriteByte(uint16_t addr, uint8_t data)
             break;
         case 0x4011:
             dmc.directLoad = data & 0x7F;
-            counters.dmcOutputSample = dmc.directLoad; // Output sample directly!
+            counters.dmcOutputSample = (uint8_t)dmc.directLoad; // Output sample directly!
             break;
         case 0x4012:
             dmc.sampleAddr = data;

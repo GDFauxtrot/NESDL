@@ -595,7 +595,7 @@ void NESDL_PPU::HandleProcessVBlankScanline()
     else if (currentScanline == 261)
     {
         // Pre-render scanline
-        bool isRenderingEnabled = (registers.mask & PPUMASK_BGENABLE) != 0x00 | (registers.mask & PPUMASK_SPRENABLE) != 0x00;
+        bool isRenderingEnabled = (registers.mask & PPUMASK_BGENABLE) != 0x00 || (registers.mask & PPUMASK_SPRENABLE) != 0x00;
         
         // Clear ALL status flags
         if (currentScanlineCycle == 1)
