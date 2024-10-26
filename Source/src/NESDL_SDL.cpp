@@ -41,6 +41,10 @@ void NESDL_SDL::SDLInit()
         printf("SDL could not initialize! SDL_Error: %s\n", SDL_GetError());
         return;
     }
+
+#ifdef _WIN32
+    SDL_SetHint(SDL_HINT_RENDER_DRIVER, "opengl");
+#endif
     
     // Initialize SDL audio
     SDL_AudioSpec spec =
@@ -52,7 +56,7 @@ void NESDL_SDL::SDLInit()
         .callback = NULL,
         .userdata = this
     };
-    audioDevice = SDL_OpenAudioDevice(NULL, 0, &spec, NULL, SDL_AUDIO_ALLOW_ANY_CHANGE);
+    audioDevice = SDL_OpenAudioDevice(NULL, 0, &spec, NULL, 0);
     if (audioDevice <= 0)
     {
         printf("Failed to open Audio Device: %s\n", SDL_GetError());
