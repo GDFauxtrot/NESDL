@@ -28,11 +28,11 @@ Currently, controls are hard-bound to the keyboard (mainly for me to use while d
 
 ## To-Do
 
-***Each action item is checkmarked to show progress*** (Updated 10/9/2024)
+***Each action item is checkmarked to show progress*** (Updated 5/14/2025)
 
 ### General/Misc
 
-- [ ] Basic APU support (audio)
+- [x] Basic APU support (audio)
 - [ ] Configuration file
   * Store Player 1/2 controls
   * Store audio level
@@ -40,7 +40,9 @@ Currently, controls are hard-bound to the keyboard (mainly for me to use while d
   * Could it be cross-emulator supported - FCEUX/Nintendulator/NESTopia loads our save state? Is there an agreed-upon standard here?
 - [ ] Rebindable keys menu
   * May be more difficult since I'm not using QT/IMGUI which would've possibly made this a breeze. Hopefully SDL has something
+- [ ] NES 2.0 header support
 - [ ] Famicom emulation (& PAL support)
+- [ ] Ubuntu & Arch package builds?
 
 
 ### Mappers
@@ -68,7 +70,23 @@ Some notable mappers I want implemented as well:
 
 ## Building
 
-Windows and Mac build information (and builds) can be provided soon. I am currently prioritizing development as the project is so early, namely getting more titles supported and controls support.
+Development instructions are heavy work-in-progress, due to lack of time and a bit of personal inexperience making open source software that's easy to download and compile.
+
+### Dependencies
+
+This project is built using **[SDL2](https://github.com/libsdl-org/SDL/releases)** (2.30.6) and **[SDL2_ttf](https://github.com/libsdl-org/SDL_ttf/releases)** (2.22.0), you will want to download the development (or "devel") versions of each on their official GitHub pages.
+
+### Windows
+
+This project was heavily developed on Mac, but started and is fully capable on Windows as well (thanks SDL!)
+
+NESDL has been tested on Visual Studio 2017+ and Windows 10+, though I see no issues with running NESDL on a Windows OS as old as SDL2 will allow (it may be fun to test this).
+
+Make sure your dev environment has SDL2 properly configured! I need to make this process easier but what you'll need to do is [outlined in this guide by Lazy Foo'](https://lazyfoo.net/tutorials/SDL/01_hello_SDL/windows/msvc2019/index.php). (Or, just unzip the SDL devel libraries in the same folder as mine, "C:\\vclibs\\...", and then either make sure SDL2 and SDL2_ttf is in your system PATH.)
+
+### Mac
+
+As of writing this (4/14/2025), it has been some time since I have opened the project on a Mac device. The same dependencies are in place for Mac as they are for Windows (a development copy of SDL2 and SDL2_ttf configured for your local Xcode development environment, ideally matching versions). At some point I will ensure the project can be easily cloned and ran with proper instructions!
 
 
 ## License
