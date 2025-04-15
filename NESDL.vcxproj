@@ -34,6 +34,7 @@
     <ClInclude Include="Source\src\nfd\nfd_common.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Source\include\NESDL_WinMenu.h" />
     <ClCompile Include="Source\src\mappers\NESDL_Mapper_0.cpp" />
     <ClCompile Include="Source\src\mappers\NESDL_Mapper_1.cpp" />
     <ClCompile Include="Source\src\mappers\NESDL_Mapper_9.cpp" />
@@ -45,6 +46,7 @@
     <ClCompile Include="Source\src\NESDL_PPU.cpp" />
     <ClCompile Include="Source\src\NESDL_RAM.cpp" />
     <ClCompile Include="Source\src\NESDL_SDL.cpp" />
+    <ClCompile Include="Source\src\NESDL_WinMenu.cpp" />
     <ClCompile Include="Source\src\nfd\nfd_common.c" />
     <ClCompile Include="Source\src\nfd\nfd_win.cpp" />
   </ItemGroup>

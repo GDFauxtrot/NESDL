@@ -64,6 +64,15 @@ int main(int argc, char* args[])
         while (SDL_PollEvent(&e))
         {
             core->HandleEvent((SDL_EventType)e.type, (SDL_KeyCode)e.key.keysym.sym);
+#ifdef _WIN32
+            if (e.type == SDL_SYSWMEVENT)
+            {
+                if (e.syswm.msg->msg.win.msg == WM_COMMAND)
+                {
+                    NESDL_WinMenu::HandleWindowEvent((int)e.syswm.msg->msg.win.wParam, core);
+                }
+            }
+#endif
             if (e.type == SDL_QUIT)
             {
                 isRunning = false;

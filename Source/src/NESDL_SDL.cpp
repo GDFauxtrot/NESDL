@@ -44,6 +44,9 @@ void NESDL_SDL::SDLInit()
 
 #ifdef _WIN32
     SDL_SetHint(SDL_HINT_RENDER_DRIVER, "opengl");
+
+    //Enable WinAPI Events Processing
+    SDL_EventState(SDL_SYSWMEVENT, SDL_ENABLE);
 #endif
     
     // Initialize SDL audio
@@ -76,6 +79,19 @@ void NESDL_SDL::SDLInit()
     }
     else
     {
+#ifdef _WIN32
+        // Windows only - initialize menu bar
+        // Mac has its own solution (convoluted macro/interop magic) elsewhere
+        NESDL_WinMenu::Initialize(window);
+        // This is required to "re-frame" the renderer to the window? Otherwise there's
+        // an odd extra menu bar-sized gap introduced to the initial texture draws
+        SDL_SetWindowSize(window, NESDL_SCREEN_WIDTH, NESDL_SCREEN_HEIGHT);
+#endif
+
+        // Necessary to clear memory before texture creation, otherwise artifacts appear
+        // (At least on MSVC it does)
+        SDL_RenderClear(renderer);
+
         // Create window texture to draw onto
         texture = SDL_CreateTexture(renderer,
             SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING,

@@ -16,6 +16,8 @@
 #endif
 #ifdef _WIN32
 #include <Windows.h>
+#include "SDL_syswm.h"
+#include "NESDL_WinMenu.h"
 #endif
 
 #include <string>

@@ -12,14 +12,14 @@ void NESDL_Core::Init(NESDL_SDL* sdl)
     // Hold onto the program's SDL context
     sdlCtx = sdl;
     
-	// Initialize the system - CPU, PPU, RAM and APU
-	cpu = new NESDL_CPU();
-	ppu = new NESDL_PPU();
-	ram = new NESDL_RAM();
-	apu = new NESDL_APU();
+    // Initialize the system - CPU, PPU, RAM and APU
+    cpu = new NESDL_CPU();
+    ppu = new NESDL_PPU();
+    ram = new NESDL_RAM();
+    apu = new NESDL_APU();
     input = new NESDL_Input();
 
-	cpu->Init(this);
+    cpu->Init(this);
     ppu->Init(this);
     ram->Init(this);
     apu->Init(this, sdlCtx);
@@ -31,9 +31,9 @@ void NESDL_Core::Init(NESDL_SDL* sdl)
 
 void NESDL_Core::Update(double deltaTime)
 {
-	// Convert deltaTime to the amount of cycles we need to advance on this frame
+    // Convert deltaTime to the amount of cycles we need to advance on this frame
     uint64_t ppuTiming1 = (uint64_t)((NESDL_PPU_CLOCK / 1000) * timeSinceStartup);
-	timeSinceStartup += deltaTime;
+    timeSinceStartup += deltaTime;
     uint64_t ppuTiming2 = (uint64_t)((NESDL_PPU_CLOCK / 1000) * timeSinceStartup);
     uint32_t ppuCycles = (uint32_t)(ppuTiming2 - ppuTiming1);
     
@@ -90,13 +90,13 @@ void NESDL_Core::Update(double deltaTime)
 
 void NESDL_Core::LoadROM(const char* path)
 {
-	ifstream file;
-	file.open(path, ifstream::in | ifstream::binary);
+    ifstream file;
+    file.open(path, ifstream::in | ifstream::binary);
 
-	// Attempt to read file as a ROM with a valid 16-byte header
+    // Attempt to read file as a ROM with a valid 16-byte header
     // (TODO what if the file is < 16 bytes, or empty? This would surely fail)
-	FileHeader_INES header;
-	file.read((char*)&header, sizeof(header));
+    FileHeader_INES header;
+    file.read((char*)&header, sizeof(header));
 
     // If header doesn't say "NES" with an EOF char, surely this isn't a valid ROM file
     if (header.id != 0x1A53454E)
@@ -104,16 +104,16 @@ void NESDL_Core::LoadROM(const char* path)
         return;
     }
     
-	// Get the program bank count and VROM bank count. We'll be reading this data soon
-	uint8_t romBankCount = header.banks;
-	uint8_t vromBankCount = header.vbanks;
+    // Get the program bank count and VROM bank count. We'll be reading this data soon
+    uint8_t romBankCount = header.banks;
+    uint8_t vromBankCount = header.vbanks;
 
-	// TODO read header for any trainer or mapping data! Then skip ahead if needed
-	// Check for trainer flag in bit 2, skip it if detected
-	if ((header.ctrl1 & 0x4) == 0x4) 
-	{
-		file.seekg(512, ios_base::cur);
-	}
+    // TODO read header for any trainer or mapping data! Then skip ahead if needed
+    // Check for trainer flag in bit 2, skip it if detected
+    if ((header.ctrl1 & 0x4) == 0x4) 
+    {
+        file.seekg(512, ios_base::cur);
+    }
     
     // Set up mapper
     uint8_t mapperNum = ((header.ctrl1 & INES_MAPPER_LOW) >> 4) | (header.ctrl2 & INES_MAPPER_HI);
@@ -135,7 +135,7 @@ void NESDL_Core::LoadROM(const char* path)
             return;
     }
 
-	// Read off the 16KB allocated PRG-ROM banks
+    // Read off the 16KB allocated PRG-ROM banks
     shared_ptr<vector<uint8_t>> prgROM;
     shared_ptr<vector<uint8_t>> chrROM;
     if (romBankCount > 0)
@@ -144,7 +144,7 @@ void NESDL_Core::LoadROM(const char* path)
         file.read((char*)prgROM->data(), romBankCount * 0x4000);
     }
 
-	// Read off the 8KB allocated CHR-ROM banks
+    // Read off the 8KB allocated CHR-ROM banks
     if (vromBankCount > 0)
     {
         chrROM = make_shared<vector<uint8_t>>(vromBankCount * 0x2000);
@@ -170,7 +170,7 @@ void NESDL_Core::LoadROM(const char* path)
     // Let components know we exist
     ram->SetMapper(mapper);
     ppu->SetMapper(mapper);
-	
+    
     romLoaded = true;
 }
 
@@ -185,6 +185,14 @@ void NESDL_Core::HandleEvent(SDL_EventType eventType, SDL_KeyCode eventKeyCode)
 bool NESDL_Core::IsROMLoaded()
 {
     return romLoaded;
+}
+
+void NESDL_Core::Action_Quit()
+{
+    // Used primarily for Windows - send a SDL_QUIT event
+    SDL_Event ev;
+    ev.type = SDL_QUIT;
+    SDL_PushEvent(&ev);
 }
 
 void NESDL_Core::Action_OpenROM()
@@ -208,11 +216,14 @@ void NESDL_Core::Action_OpenROM()
 }
 void NESDL_Core::Action_CloseROM()
 {
-    // Leave all states intact but "unplug" all cartridge data
-    free(mapper);
-    ram->SetMapper(nullptr);
-    ppu->SetMapper(nullptr);
-    romLoaded = false;
+    if (romLoaded)
+    {
+        // Leave all states intact but "unplug" all cartridge data
+        free(mapper);
+        ram->SetMapper(nullptr);
+        ppu->SetMapper(nullptr);
+        romLoaded = false;
+    }
 }
 void NESDL_Core::Action_ResetSoft()
 {

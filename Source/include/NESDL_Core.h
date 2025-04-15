@@ -34,6 +34,7 @@ public:
     bool IsROMLoaded();
 
     // Menu bar actions (called from OS-specific areas)
+	void Action_Quit();
     void Action_OpenROM();
     void Action_CloseROM();
     void Action_ResetSoft();
