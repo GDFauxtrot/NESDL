@@ -33,6 +33,7 @@ Currently, controls are hard-bound to the keyboard (mainly for me to use while d
 ### General/Misc
 
 - [x] Basic APU support (audio)
+  - Not fully working but mostly capable, some issues or inconsistencies may occur
 - [ ] Configuration file
   * Store Player 1/2 controls
   * Store audio level
@@ -82,7 +83,9 @@ This project was heavily developed on Mac, but started and is fully capable on W
 
 NESDL has been tested on Visual Studio 2017+ and Windows 10+, though I see no issues with running NESDL on a Windows OS as old as SDL2 will allow (it may be fun to test this).
 
-Make sure your dev environment has SDL2 properly configured! I need to make this process easier but what you'll need to do is [outlined in this guide by Lazy Foo'](https://lazyfoo.net/tutorials/SDL/01_hello_SDL/windows/msvc2019/index.php). (Or, just unzip the SDL devel libraries in the same folder as mine, "C:\\vclibs\\...", and then either make sure SDL2 and SDL2_ttf is in your system PATH.)
+Make sure your dev environment has SDL2 properly configured! I need to make this process easier but what you'll need to do is [outlined in this guide by Lazy Foo'](https://lazyfoo.net/tutorials/SDL/01_hello_SDL/windows/msvc2019/index.php). (Or, just unzip the SDL devel libraries in the same folder as mine, "C:\\vclibs\\...", and then either make sure SDL2 and SDL2_ttf is in your system PATH or DLL's included in your build directory.)
+
+A final step to ensure fonts are working in your dev builds - include the "font" folder where your NESDL build executables are.
 
 ### Mac
 
