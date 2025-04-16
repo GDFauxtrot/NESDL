@@ -7,9 +7,9 @@
 class NESDL_Text
 {
 public:
-    NESDL_Text(const char* text, SDL_Texture* texture, int x, int y)
+    NESDL_Text(string text, SDL_Texture* texture, int x, int y)
     :text(text), texture(texture), textColor({0, 0, 0}), x(x), y(y), width(0), height(0), background(false), backgroundFrameColor({24, 0, 80, 128}), backgroundPadding(2), wrapLength(9999) {}
-    const char* text;
+    string text;
     SDL_Texture* texture;
     SDL_Color textColor;
     int x;
@@ -25,10 +25,10 @@ public:
 class NESDL_SDL
 {
 public:
-	void SDLInit();
-	void SDLQuit();
+    void SDLInit();
+    void SDLQuit();
     void SetCore(NESDL_Core* coreRef);
-	void UpdateScreen(double fps);
+    void UpdateScreen(double fps);
     void UpdateScreenTexture();
     void GetCloseWindowEvent(SDL_WindowEvent event);
     
@@ -41,9 +41,10 @@ public:
     void ToggleShowNT();
     
     // Functions for handling on-screen text (NESDL_Text)
-    NESDL_Text* AddNewScreenText(const char* id, const char* text, int x, int y);
+    NESDL_Text* AddNewScreenText(const char* id, string text, int x, int y);
+    NESDL_Text* ShowTextNotice(string text);
     void SetScreenTextPosition(const char* id, int x, int y);
-    void SetScreenTextText(const char* id, const char* text);
+    void SetScreenTextText(const char* id, string text);
     void SetScreenTextColor(const char* id, SDL_Color color);
     void SetScreenTextWrap(const char* id, int wrapLength);
     void RemoveScreenText(const char* id);
@@ -57,11 +58,15 @@ public:
     
     SDL_AudioDeviceID audioDevice;
 private:
+    default_random_engine rng;
+    uniform_int_distribution<int> dist;
+
     unordered_map<const char*, NESDL_Text*> screenText;
+    queue<pair<const char*, double>> screenNotices;
     TTF_Font* font;
     NESDL_Core* core;
-	SDL_Window* window;
-	SDL_Renderer* renderer;
+    SDL_Window* window;
+    SDL_Renderer* renderer;
     SDL_Texture* texture;
     SDL_Texture* scanlineTexture;
     

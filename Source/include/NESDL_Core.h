@@ -58,11 +58,11 @@ public:
     NESDL_Mapper* mapper;
     
     bool romLoaded;
+	bool paused;
 private:
     NESDL_SDL* sdlCtx;
     
     double timeSinceStartup;
-    bool paused;
     bool stepFrame;
     bool stepCPU;
     bool stepPPU;

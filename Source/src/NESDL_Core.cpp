@@ -130,7 +130,11 @@ void NESDL_Core::LoadROM(const char* path)
             mapper = new NESDL_Mapper_9(this);
             break;
         default:
-            printf("ROM uses an unsupported mapper! #%d\n", mapperNum);
+            stringstream ss;
+            ss << "ROM uses an unsupported mapper! #" << to_string(mapperNum);
+            sdlCtx->ShowTextNotice(ss.str().c_str());
+            ss << "\n";
+            printf(ss.str().c_str());
             file.close();
             return;
     }
@@ -223,6 +227,10 @@ void NESDL_Core::Action_CloseROM()
         ram->SetMapper(nullptr);
         ppu->SetMapper(nullptr);
         romLoaded = false;
+        
+        // Clear screen on ROM close (better signifier of ROM no longer running than not)
+        memset(ppu->frameData, 0x00, sizeof(ppu->frameData));
+        sdlCtx->UpdateScreenTexture();
     }
 }
 void NESDL_Core::Action_ResetSoft()

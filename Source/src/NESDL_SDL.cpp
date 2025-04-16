@@ -35,6 +35,9 @@ void NESDL_SDL::SDLInit()
     // Clear the window ptr we'll be rendering to
     window = NULL;
     
+    // Initialize RNG
+    dist = uniform_int_distribution<int>(0, INT_MAX);
+
     // Initialize SDL
     if (SDL_Init(SDL_INIT_EVERYTHING) < 0)
     {
@@ -146,7 +149,16 @@ void NESDL_SDL::SDLInit()
         printf("SDL_TTF could not initialize! SDL_TTF Error: %s\n", TTF_GetError());
     }
     // Open and load font(s)
+#ifdef _WIN32
+	// ...because Windows just has to be difficult
+	char strBuf[_MAX_PATH];
+	GetModuleFileNameA(NULL, strBuf, _MAX_PATH);
+	stringstream ssPath;
+	ssPath << filesystem::path(strBuf).parent_path().string() << "\\font\\Inconsolata-Regular.ttf";
+	font = TTF_OpenFont(ssPath.str().c_str(), 12);
+#else
     font = TTF_OpenFont("font/Inconsolata-Regular.ttf", 12);
+#endif
 }
 
 void NESDL_SDL::SDLQuit()
@@ -192,9 +204,8 @@ void NESDL_SDL::UpdateScreen(double fps)
         SetScreenTextText("ppu", s.c_str());
         if (showCPU)
         {
-            NESDL_Text* cpuText = GetScreenText("cpu");
             NESDL_Text* ppuText = GetScreenText("ppu");
-            ppuText->y = cpuText->height + 4;
+            ppuText->y = GetScreenTextHeight("cpu");
         }
         else
         {
@@ -207,8 +218,21 @@ void NESDL_SDL::UpdateScreen(double fps)
     SDL_RenderClear(renderer);
     SDL_RenderCopy(renderer, texture, NULL, NULL);
     
+    if (core->paused)
+    {
+        NESDL_Text* text = AddNewScreenText("paused", "Paused", 0, 0);
+        text->background = true;
+        text->textColor = { 255, 255, 255 };
+        SetScreenTextPosition("paused", NESDL_SCREEN_WIDTH - text->width, NESDL_SCREEN_HEIGHT - text->height);
+        UpdateScreenTextTexture("paused");
+    }
+    else
+    {
+        RemoveScreenText("paused");
+    }
+
     // Draw an overlay over the screen when a game isn't inserted
-    if (core->romLoaded == false)
+    if (core->romLoaded == false || core->paused)
     {
         int w;
         int h;
@@ -227,7 +251,8 @@ void NESDL_SDL::UpdateScreen(double fps)
     double winMulY = (double)winY / NESDL_SCREEN_HEIGHT;
     
     // Iterate through NESDL_Text instances and draw them
-    for(const auto& textKV: screenText) {
+    for(const auto& textKV: screenText)
+	{
         NESDL_Text* value = textKV.second;
         if (value->texture != nullptr)
         {
@@ -253,6 +278,27 @@ void NESDL_SDL::UpdateScreen(double fps)
                 SDL_Rect renderRect = { x, y, w, h };
                 SDL_RenderCopy(renderer, value->texture, nullptr, &renderRect); // Text render
             }
+        }
+    }
+    // Iterate through text timers and handle them (removing timed-out text)
+    int y = 0;
+    for (size_t i = 0; i < screenNotices.size(); ++i) {
+        pair<const char*, double> element = std::move(screenNotices.front());
+        screenNotices.pop();
+        element.second -= 1/fps;
+        NESDL_Text* t = GetScreenText(element.first);
+        if (element.second < 0)
+        {
+            // Remove screen text
+            RemoveScreenText(element.first);
+            --i;
+        }
+        else
+        {
+            SetScreenTextPosition(element.first, 0, y);
+            y += GetScreenTextHeight(element.first);
+            // Put element back into queue
+            screenNotices.push(std::move(element));
         }
     }
     
@@ -372,7 +418,7 @@ void NESDL_SDL::ToggleShowNT()
 
 /// Creates a new NESDL_Text instance with the given ID. This allows for lots of flexibility
 /// to draw information to the screen, and store rendered font textures for reuse.
-NESDL_Text* NESDL_SDL::AddNewScreenText(const char* id, const char* text, int x, int y)
+NESDL_Text* NESDL_SDL::AddNewScreenText(const char* id, string text, int x, int y)
 {
     // Do nothing if we've already added this ID
     if (screenText.contains(id))
@@ -385,6 +431,27 @@ NESDL_Text* NESDL_SDL::AddNewScreenText(const char* id, const char* text, int x,
     return screenText[id];
 }
 
+/// Creates a new screen text with the purpose of existing in the top-left corner of the screen
+/// that disappears over time. Notices are assigned a random id, and are tracked
+/// separately in order to handle auto-position placement and width
+NESDL_Text* NESDL_SDL::ShowTextNotice(string text)
+{
+    // RNG new id, allocate new cstr (should id's just be strings at this point?)
+    string id = to_string(dist(rng));
+    char* idStr = new char[id.size()];
+    strcpy(idStr, id.c_str());
+
+    NESDL_Text* notice = AddNewScreenText(idStr, text, 0, 0);
+    notice->background = true;
+    notice->textColor = { 255, 255, 255 };
+    SetScreenTextWrap(idStr, (int)((double)NESDL_SCREEN_WIDTH/1.5));
+
+    // Add text to list of notices with a default timer
+    screenNotices.push(pair<const char*, double>(idStr, 5));
+
+    return notice;
+}
+
 void NESDL_SDL::SetScreenTextPosition(const char* id, int x, int y)
 {
     if (!screenText.contains(id))
@@ -395,7 +462,7 @@ void NESDL_SDL::SetScreenTextPosition(const char* id, int x, int y)
     screenText[id]->y = y;
 }
 
-void NESDL_SDL::SetScreenTextText(const char* id, const char* text)
+void NESDL_SDL::SetScreenTextText(const char* id, string text)
 {
     if (!screenText.contains(id))
     {
@@ -427,6 +494,11 @@ void NESDL_SDL::SetScreenTextWrap(const char* id, int wrapLength)
 
 void NESDL_SDL::RemoveScreenText(const char* id)
 {
+    if (!screenText.contains(id))
+    {
+        return;
+    }
+    delete screenText[id];
     screenText.erase(id);
 }
 
@@ -445,13 +517,13 @@ void NESDL_SDL::UpdateScreenTextTexture(const char* id)
     }
     
     // Don't continue if empty string (causes an error)
-    if (strcmp(nesdlText->text, "") == 0)
+    if (nesdlText->text.size() == 0)
     {
         return;
     }
     
     // Draw text to an SDL_Surface first
-    SDL_Surface* textSurface = TTF_RenderText_Solid_Wrapped(font, nesdlText->text, nesdlText->textColor, nesdlText->wrapLength);
+    SDL_Surface* textSurface = TTF_RenderText_Solid_Wrapped(font, nesdlText->text.c_str(), nesdlText->textColor, nesdlText->wrapLength);
     if (textSurface == nullptr)
     {
         printf("Unable to render text surface! SDL_TTF Error: %s\n", TTF_GetError());
@@ -518,7 +590,14 @@ int NESDL_SDL::GetScreenTextWidth(const char* id)
     {
         return 0;
     }
-    return screenText[id]->width;
+    if (screenText[id]->background)
+    {
+        return screenText[id]->width + screenText[id]->backgroundPadding * 2;
+    }
+    else
+    {
+        return screenText[id]->width;
+    }
 }
 
 int NESDL_SDL::GetScreenTextHeight(const char* id)
@@ -527,5 +606,12 @@ int NESDL_SDL::GetScreenTextHeight(const char* id)
     {
         return 0;
     }
-    return screenText[id]->height;
+    if (screenText[id]->background)
+    {
+        return screenText[id]->height + screenText[id]->backgroundPadding * 2;
+    }
+    else
+    {
+        return screenText[id]->height;
+    }
 }
