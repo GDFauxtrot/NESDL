@@ -95,3 +95,5 @@ As of writing this (4/14/2025), it has been some time since I have opened the pr
 ## License
 
 This software is licensed under [GNU GPLv3](https://choosealicense.com/licenses/gpl-3.0/), and has been included in this repository (see LICENSE for a copy)
+
+This software uses the library [nativefiledialog](https://github.com/mlabbe/nativefiledialog). Its license [can be found here](https://github.com/mlabbe/nativefiledialog/blob/master/LICENSE). Some modification of the source code has been performed, including removing the removal of platform-specific files; any further modifications have been denoted in the source code itself.
