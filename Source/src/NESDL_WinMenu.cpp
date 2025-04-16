@@ -1,25 +1,26 @@
 #include "NESDL.h"
 
-#define ID_FILE_OPEN	1
-#define ID_FILE_CLOSE	2
-#define ID_FILE_RESET	3
-#define ID_FILE_RESETH	4
-#define ID_FILE_QUIT	5
+#define ID_FILE_OPEN	101
+#define ID_FILE_CLOSE	102
+#define ID_FILE_RESET	103
+#define ID_FILE_RESETH	104
+#define ID_FILE_QUIT	105
 
-#define ID_VIEW_RESIZE1	6
-#define ID_VIEW_RESIZE2	7
-#define ID_VIEW_RESIZE3	8
-#define ID_VIEW_RESIZE4	9
-#define ID_VIEW_FRAME	10
-#define ID_VIEW_SHOWCPU	11
-#define ID_VIEW_SHOWPPU	12
-#define ID_VIEW_SHOWNT	13
+#define ID_VIEW_RESIZE1	201
+#define ID_VIEW_RESIZE2	202
+#define ID_VIEW_RESIZE3	203
+#define ID_VIEW_RESIZE4	204
+#define ID_VIEW_FRAME	205
+#define ID_VIEW_SHOWCPU	206
+#define ID_VIEW_SHOWPPU	207
+#define ID_VIEW_SHOWNT	208
+#define ID_VIEW_ABOUT	209
 
-#define ID_DBUG_RUN		14
-#define ID_DBUG_PAUSE	15
-#define ID_DBUG_STEPFRM	16
-#define ID_DBUG_STEPCPU	17
-#define ID_DBUG_STEPPPU	18
+#define ID_DBUG_RUN		301
+#define ID_DBUG_PAUSE	302
+#define ID_DBUG_STEPFRM	303
+#define ID_DBUG_STEPCPU	304
+#define ID_DBUG_STEPPPU	305
 
 void NESDL_WinMenu::Initialize(SDL_Window* window)
 {
@@ -55,6 +56,7 @@ void NESDL_WinMenu::Initialize(SDL_Window* window)
     AppendMenu(viewMenu, MF_STRING, ID_VIEW_SHOWCPU, L"Show CPU Info");
     AppendMenu(viewMenu, MF_STRING, ID_VIEW_SHOWPPU, L"Show PPU Info");
     AppendMenu(viewMenu, MF_STRING, ID_VIEW_SHOWNT, L"Show NT Viewer");
+    AppendMenu(viewMenu, MF_STRING, ID_VIEW_ABOUT, L"About...");
 
     // Debug menu is last
     AppendMenu(mainMenu, MF_POPUP, (UINT_PTR)debugMenu, L"Debug");
@@ -110,6 +112,9 @@ void NESDL_WinMenu::HandleWindowEvent(int eventId, NESDL_Core* core)
             break;
         case ID_VIEW_SHOWNT:
             core->Action_DebugShowNT();
+            break;
+        case ID_VIEW_ABOUT:
+            core->Action_ShowAbout();
             break;
         case ID_DBUG_RUN:
             core->Action_DebugRun();

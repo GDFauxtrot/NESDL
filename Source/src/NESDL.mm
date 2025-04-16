@@ -13,6 +13,7 @@
 // Called from main to kick everything off in Objective-C
 - (int) NESDLMain:(int)argc secondValue:(const char*[])argv;
 // Menu item callbacks
+- (void) showAbout:(nullable id)sender;
 - (void) openROM:(nullable id)sender;
 - (void) closeROM:(nullable id)sender;
 - (void) resetSoft:(nullable id)sender;
@@ -88,6 +89,7 @@ NSMenu* AddSubMenuToMenuItem(NSMenuItem* menuItem)
     CreateMenuItemAndAddToMenu(viewMenu, self, @"Show CPU Info", @selector(debugShowCPU:), @"");
     CreateMenuItemAndAddToMenu(viewMenu, self, @"Show PPU Info", @selector(debugShowPPU:), @"");
     CreateMenuItemAndAddToMenu(viewMenu, self, @"Show NT Viewer", @selector(debugShowNT:), @"");
+    CreateMenuItemAndAddToMenu(viewMenu, self, @"About...", @selector(showAbout:), @"");
     menuItem = [[NSMenuItem alloc] init];
     [menuItem setSubmenu:viewMenu];
     [[NSApp mainMenu] insertItem:menuItem atIndex:2];
@@ -107,6 +109,9 @@ NSMenu* AddSubMenuToMenuItem(NSMenuItem* menuItem)
     return exitCode;
 }
 
+- (void) showAbout:(nullable id)sender {
+    nesdl.core->Action_ShowAbout();
+}
 - (void) openROM:(nullable id)sender {
     nesdl.core->Action_OpenROM();
 }

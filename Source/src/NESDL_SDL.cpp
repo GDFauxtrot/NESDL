@@ -335,6 +335,21 @@ void NESDL_SDL::GetCloseWindowEvent(SDL_WindowEvent event)
     }
 }
 
+void NESDL_SDL::ShowAbout()
+{
+    stringstream ss;
+    ss << "NESDL - Another NES emulator written in SDL\n";
+    ss << "v" << NESDL_VERSION_STR << " (" << NESDL_VERSIONDATE << ")\n\n";
+    ss << "Written by GDFauxtrot\n";
+    ss << "Follow development and download updates\n";
+    ss << "on the official GitHub page!\n";
+    ss << "https://github.com/GDFauxtrot/NESDL";
+    SDL_ShowSimpleMessageBox(
+        0, "About NESDL",
+        ss.str().c_str(),
+        window);
+}
+
 void NESDL_SDL::ToggleFrameInfo()
 {
     showFrameInfo = !showFrameInfo;

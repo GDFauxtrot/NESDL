@@ -199,6 +199,11 @@ void NESDL_Core::Action_Quit()
     SDL_PushEvent(&ev);
 }
 
+void NESDL_Core::Action_ShowAbout()
+{
+    sdlCtx->ShowAbout();
+}
+
 void NESDL_Core::Action_OpenROM()
 {
     nfdchar_t *romFilePath = NULL;

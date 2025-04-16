@@ -7,7 +7,10 @@ class NESDL_Core; // Decl needed for pointer refs
 // Screen dimension constants
 #define NESDL_SCREEN_WIDTH 256
 #define NESDL_SCREEN_HEIGHT 240
+
 const string NESDL_WINDOW_NAME = "NESDL";
+const string NESDL_VERSION_STR = "0.1.0";
+const string NESDL_VERSIONDATE = "April 16th, 2025";
 
 // PPU
 #define PPU_WIDTH 256

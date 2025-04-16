@@ -34,6 +34,7 @@ public:
     
     void WriteNextAPUSignal(float s);
     
+    void ShowAbout();
     void ToggleFrameInfo();
     void Resize(int resize);
     void ToggleShowCPU();
