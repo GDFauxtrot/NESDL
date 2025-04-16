@@ -7,17 +7,20 @@
 [![sdl2](https://img.shields.io/badge/SDL%202.0-132B48?style=flat)](https://wiki.libsdl.org/SDL2/Introduction)
 [![windows](https://img.shields.io/badge/Build-Windows-green?style=flat&logo=data%3Aimage%2Fpng%3Bbase64%2CiVBORw0KGgoAAAANSUhEUgAAAgAAAAIACAQAAABecRxxAAAABGdBTUEAALGPC%2FxhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAAmJLR0QA%2F4ePzL8AAAAHdElNRQfoBwENJANcZqt1AAAEt0lEQVR42u3dsQ2DMBCG0TNiJXaApSiyR%2BYwO6TMDJnjWIAC0lg6vddf88v6WrfMoLqjbc%2BPssdquuomE4AAAAIACAAgAIAAAAIACAAgAIAAAAIACAAgAIAAAAIACAAgAIAAAAIACAAgAIAAAAIACAAgAIAAAAIACAAgAIAAAAIACAAgAIAAAAIACAAgACAAgAAAAgAIACAAgAAAAgAIACAAgAAAAgAIACAAgAAAAgAIACAAgAAAAgAIACAAgAAAAgAIACAAgAAAAgAIACAAgAAAAgAIACAAgAAAAgAIACAAIACAAAACAAgAIACAAAACAAgAIACAAAACAAgAIACAAAACAAgAIACAAAACAAgAIACAAAACAAgAIACAAAACAAgAIACAAAACAAgAIACAAAACAAgAIAAgAIAAAAIACAAgAIAAAAIACAAgAIAAAAIACAAgAIAAAAIACAAgAIAAAAIACAAgAIAAAAIACAAgAIAAAAIACAAgAIAAAAIACAAgAIAAAAIACAAgACAAgAAAAgAIACAAgAAAAgAIACAAgAAAAgAIACAAgAAAAgAIACAAgAAAAgAIACAAgAAAAgAIACAAgAAAAgAIACAAgAAAAgAIACAAgAAAAgAIACAAIACAAAACAAgAIACAAAACAAgAIACAAAACAAgAIACAAAACAAgAIACAAAACAAgAIACAAAACAAgAIACAAAACAAgAIACAAAACAAgAIACAAAACAAgAIAAgAIAAAAIACAAgAIAAAAIACAAgAIAAAAIACAAgAIAAAAIACAAgAIAAAAIAjDHH2wjlff%2B6OuJnOgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACA%2B1p2I5T3afvzo3zFYrrq5liNwKXF26jP78AgAIAAAAIACAAgAIAAAAIACAAgAIAAAAIACAAgAIAAAAIACAAgAIAAAAIACAAgAIAAAAIACAAgAIAAAAIACAAgAIAAAAIACAAgAIAAAAIACAAIgAlAAAABAAQAEABAAAABAAQAEABAAAABAAQAEABAAAABAAQAEABAAAABAAQAEABAAAABAAQAEABAAAABAAQAEABAAAABAAQAEABAAAABAAQAEAAQAEAAAAEABAAQAEAAAAEABAAQAEAAAAEABAAQAEAAAAEABAAQAEAAAAEABAAQAEAAAAEABAAQAEAAAAEABAAQAEAAAAEABAAQAEAAAAEABAAQABAAQAAAAQAEABAAQAAAAQAEABAAQAAAAQAEABAAQAAAAQAEABAAQAAAAQAEABAAQAAAAQAEABAAQAAAAQAEABAAQAAAAQAEABAAQAAAAQAEABAAEABAAAABAAQAEABAAAABAAQAEABAAAABAAQAEABAAAABAAQAEABAAAABAAQAEABAAAABAAQAEABAAAABAAQAEABAAAABAAQAEABAAAABAAQAEAAQAEAAAAEABAAQAEAAAAEABAAQAEAAAAEABAAQAEAAAAEABAAQAEAAAAEABAAQAEAAAAEABAAQAEAAAAEABAAQAEAAAAEABAAQAEAAAAEABAAQABAAQAAAAQAEABAAQAAAAQAEABAAQAAAAQAEABAAQAAAAQAEABAAQAAAAQAGOQHLshFV6K14LgAAACV0RVh0ZGF0ZTpjcmVhdGUAMjAyNC0wNy0wMVQxMzozNjowMiswMDowMJfNZf8AAAAldEVYdGRhdGU6bW9kaWZ5ADIwMjQtMDctMDFUMTM6MzY6MDIrMDA6MDDmkN1DAAAAAElFTkSuQmCC)](https://github.com/GDFauxtrot/NESDL/releases)
 
-A NES emulator written in C++ and SDL2. Just a fun project to see if I could make one, nothing more! Made for Mac and PC, but a Linux build should be possible as well.
+An NES emulator written in C++ and SDL2. Just a fun project to see if I could make one, nothing more! Made for Windows and (soon) Mac, but a Linux build should be possible as well.
 
 **Note:** this is *EARLY* in development! It is missing several features, such as:
 
-  * Some popular ROM mappers (like MMC3, for now)
+  * Some popular ROM mappers (see below for list)
   * Player 2 (the logic is in place, but no keybinds yet)
   * Non-standard controller support (eg. Zapper, Power Pad, and so on)
   * Rebindable controls
   * Save/load states
   * Cartridge save data (eg. Excitebike stages, Kirby's Adventure progress, etc.)
-  * PAL region support
+  * PAL & Famicom support
+  * NES 2.0 header ROMs
+  * Palette configuration
+  * Audio/volume configuration
 
 ![](img/title.png)
 
@@ -35,7 +38,7 @@ Currently, controls are hard-bound to the keyboard (mainly for me to use while d
 
 ## To-Do
 
-***Each action item is checkmarked to show progress*** (Updated 5/14/2025)
+***Each action item is checkmarked to show progress*** (Updated 4/16/2025)
 
 ### General/Misc
 
@@ -78,7 +81,7 @@ Some notable mappers I want implemented as well:
 
 ## Building
 
-Development instructions are heavy work-in-progress, due to lack of time and a bit of personal inexperience making open source software that's easy to download and compile.
+Development instructions are heavy work-in-progress, due to lack of time and personal inexperience making open source software that's easy to download and compile.
 
 ### Dependencies
 
