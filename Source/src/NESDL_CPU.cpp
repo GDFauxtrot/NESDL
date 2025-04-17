@@ -4,6 +4,7 @@ void NESDL_CPU::Init(NESDL_Core* c)
 {
     core = c;
     addrModeResult = new AddressModeResult();
+	showCPULogs = true;
 }
 
 void NESDL_CPU::Reset(bool hardReset)
@@ -79,7 +80,7 @@ void NESDL_CPU::Update(uint32_t ppuCycles)
             if (showCPULogs)
             {
                 // Debug Nintendulator format
-                printf("\n%04X\t\t\t\t\t\t\t\t\t\t\tA:%02X X:%02X Y:%02X P:%02X SP:%02X PPU:%3d,%3d CYC:%llu", registers.pc, registers.a, registers.x, registers.y, registers.p, registers.sp, core->ppu->currentScanlineCycle, core->ppu->currentScanline, elapsedCycles);
+                //printf("\n%04X  %02X\t\t\t\t\t\tA:%02X X:%02X Y:%02X P:%02X SP:%02X PPU:%3d,%3d CYC:%llu", registers.pc, core->ram->ReadByte(registers.pc), registers.a, registers.x, registers.y, registers.p, registers.sp, core->ppu->currentScanline, core->ppu->currentScanlineCycle, elapsedCycles);
             }
             
             ppuCycleCounter -= nextInstructionPPUCycles;
@@ -1449,8 +1450,10 @@ void NESDL_CPU::OP_SEI(uint8_t opcode, AddrMode mode)
 void NESDL_CPU::OP_STA(uint8_t opcode, AddrMode mode)
 {
     core->ppu->incrementV = false;
+    core->ppu->isWriting = true;
     GetByteForAddressMode(mode, addrModeResult);
     core->ppu->incrementV = true;
+    core->ppu->isWriting = false;
     AdvanceCyclesForAddressMode(opcode, mode, true, false, false);
     
     core->ram->WriteByte(addrModeResult->address, registers.a);
@@ -1459,8 +1462,10 @@ void NESDL_CPU::OP_STA(uint8_t opcode, AddrMode mode)
 void NESDL_CPU::OP_STX(uint8_t opcode, AddrMode mode)
 {
     core->ppu->incrementV = false;
+    core->ppu->isWriting = true;
     GetByteForAddressMode(mode, addrModeResult);
     core->ppu->incrementV = true;
+    core->ppu->isWriting = false;
     AdvanceCyclesForAddressMode(opcode, mode, false, false, false);
     
     core->ram->WriteByte(addrModeResult->address, registers.x);
@@ -1469,8 +1474,10 @@ void NESDL_CPU::OP_STX(uint8_t opcode, AddrMode mode)
 void NESDL_CPU::OP_STY(uint8_t opcode, AddrMode mode)
 {
     core->ppu->incrementV = false;
+    core->ppu->isWriting = true;
     GetByteForAddressMode(mode, addrModeResult);
     core->ppu->incrementV = true;
+    core->ppu->isWriting = false;
     AdvanceCyclesForAddressMode(opcode, mode, false, false, false);
     
     core->ram->WriteByte(addrModeResult->address, registers.y);

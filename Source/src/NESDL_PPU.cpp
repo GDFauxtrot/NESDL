@@ -7,11 +7,12 @@ void NESDL_PPU::Init(NESDL_Core* c)
 
 void NESDL_PPU::Reset(bool hardReset)
 {
-    elapsedCycles = 0;
+    elapsedCycles = 21;
     currentFrame = 0;
     currentScanline = 0;
     currentScanlineCycle = 0;
     currentDrawX = 0;
+	ppuOpenBus = 0x1F; // Not always on IRL hardware, but most of the time
     registers.ctrl = 0;
     registers.mask = 0;
     if (hardReset)
@@ -665,6 +666,7 @@ void NESDL_PPU::PreprocessPPUForReadInstructionTiming(uint8_t instructionPPUTime
         if (cyclesThisFrame == setTarget)
         {
             registers.status |= PPUSTATUS_VBLANK;
+            disregardVBL = true;
         }
         if (cyclesThisFrame < setTarget && cyclesAfterInstruction >= (setTarget-1))
         {
@@ -733,7 +735,11 @@ void NESDL_PPU::WriteToRegister(uint16_t registerAddr, uint8_t data)
     {
         return;
     }
-    
+
+    // Writes to any register load the open bus
+    // https://www.nesdev.org/wiki/Open_bus_behavior#PPU_open_bus
+    ppuOpenBus = data;
+
     switch (registerAddr)
     {
         case PPU_PPUCTRL:
@@ -845,19 +851,20 @@ uint8_t NESDL_PPU::ReadFromRegister(uint16_t registerAddr)
             break;
         case PPU_PPUSTATUS:
             {
-                // On PPUSTATUS read, always set latch w to 0
-                if (ignoreChanges)
+                // Ignore VBL reset if operation is writing
+                if (ignoreChanges || isWriting)
                 {
-                    return registers.status;
+                    ppuOpenBus = (ppuOpenBus & 0x1F) + (registers.status & 0xE0);
                 }
                 else
                 {
+                    // On PPUSTATUS read, always set latch w to 0
                     registers.w = false;
                     uint8_t output = registers.status;
                     // Also reset VBLANK on read
                     registers.status &= ~PPUSTATUS_VBLANK;
-                    // TODO emulate "PPU stale bus contents" for some flimsily copy-protected titles
-                    return output;
+                    // Put data onto open bus for return
+                    ppuOpenBus = (ppuOpenBus & 0x1F) + (output & 0xE0);
                 }
             }
             break;
@@ -866,7 +873,9 @@ uint8_t NESDL_PPU::ReadFromRegister(uint16_t registerAddr)
             break;
         case PPU_OAMDATA:
             // Some models don't have read functionality. We can assume developers knew this at the time, and don't bother truly implementing this (famous last words)
-            return 0xFF;
+            ppuOpenBus = 0xFF;
+            //return 0xFF;
+            break;
         case PPU_PPUSCROLL:
             // Undefined behavior to read from PPUSCROLL -- do nothing
             break;
@@ -882,9 +891,11 @@ uint8_t NESDL_PPU::ReadFromRegister(uint16_t registerAddr)
                 }
                 else
                 {
+                    // Return palette data ("unreliable"), otherwise return VRAM data
                     if (registers.v >= 0x3F00)
                     {
-                        return ReadFromVRAM(registers.v);
+                        // Put data onto open bus for return
+                        ppuOpenBus = (ppuOpenBus & 0xC0) + (ReadFromVRAM(registers.v) & 0x3F);
                     }
                     else
                     {
@@ -895,7 +906,8 @@ uint8_t NESDL_PPU::ReadFromRegister(uint16_t registerAddr)
                         {
                             registers.v += (registers.ctrl & PPUCTRL_INCMODE >> 2) == 0 ? 1 : 32;
                         }
-                        return vramData;
+                        // Put data onto open bus for return
+                        ppuOpenBus = vramData;
                     }
                 }
             }
@@ -905,7 +917,7 @@ uint8_t NESDL_PPU::ReadFromRegister(uint16_t registerAddr)
             break;
     }
     
-    return 0;
+    return ppuOpenBus;
 }
 
 uint8_t NESDL_PPU::ReadFromVRAM(uint16_t addr)

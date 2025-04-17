@@ -155,7 +155,7 @@ void NESDL_APU::Update(uint32_t ppuCycles)
         }
         
         // DMC
-        if (counters.dmcTimer == 0)
+        if (counters.dmcTimer == 0 && false) // DISABLED
         {
             counters.dmcTimer = NESDL_DMC_RATE[dmc.rate]/4;
             

@@ -16,8 +16,12 @@ uint8_t NESDL_RAM::ReadByte(uint16_t addr)
     {
         return ram[addr % 0x800];
     }
-    // 0x2000 - 0x3FFF : 8 PPU + OAM registers (+ mirroring)
-    else if (addr < 0x4000 || addr == 0x4014)
+    // 0x2000 - 0x3FFF, 0x4014 : 8 PPU + OAM registers (+ mirroring)
+    else if (addr < 0x4000)
+    {
+        return core->ppu->ReadFromRegister(0x2000 + (addr % 8));
+    }
+    else if (addr == 0x4014)
     {
         return core->ppu->ReadFromRegister(addr);
     }
@@ -78,7 +82,11 @@ void NESDL_RAM::WriteByte(uint16_t addr, uint8_t data)
         ram[addr % 0x800] = data;
     }
     // 0x2000 - 0x3FFF, 0x4014 : 8 PPU + OAM registers (+ mirroring)
-    else if (addr < 0x4000 || addr == 0x4014)
+    else if (addr < 0x4000)
+    {
+        core->ppu->WriteToRegister(0x2000 + (addr % 8), data);
+    }
+    else if (addr == 0x4014)
     {
         core->ppu->WriteToRegister(addr, data);
     }
