@@ -121,7 +121,7 @@ int main(int argc, char* args[])
         */
         SDL_Delay((uint32_t) max(floor(16.6666 - ms), 0)); // Takes whole ms, we'd rather wait less MS than more
 #else
-        SDL_Delay((uint32_t) max(floor(16.6666 - ms), 0)); // Takes whole ms, we'd rather wait less MS than more
+        SDL_Delay((uint32_t) max(floor(16.6666 - ms), (double)0)); // Takes whole ms, we'd rather wait less MS than more
         // Can we get a more granular timer?
 #endif
     }

@@ -1,3 +1,4 @@
+#ifdef _WIN32
 #include "NESDL.h"
 
 #define ID_FILE_OPEN	101
@@ -133,3 +134,4 @@ void NESDL_WinMenu::HandleWindowEvent(int eventId, NESDL_Core* core)
             break;
     }
 }
+#endif
