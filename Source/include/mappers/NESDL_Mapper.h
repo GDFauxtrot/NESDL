@@ -65,7 +65,36 @@ private:
     void WriteControl();
     void WriteCHRBank(uint8_t index);
     void WritePRGBank();
-    MirroringMode mirroringMode;
+    uint8_t shiftRegister;
+    uint8_t shiftIndex;
+    uint8_t prgROM0Index;   // PRG 16KB bank 1
+    uint8_t prgROM1Index;   // PRG 16KB bank 2
+    uint8_t chrROM0Index;   // CHR  4KB bank 1
+    uint8_t chrROM1Index;   // CHR  4KB bank 2
+    uint8_t prgROMMode;
+    uint8_t prgRAM[0x2000];
+    bool chrROMMode;
+    bool prgRAMEnable;
+};
+
+/// iNES Header 004 - "MMC3" (Released October 1988, "Super Mario Bros 2" US)
+/// https://www.nesdev.org/wiki/MMC3
+///
+/// Second-most popular mapper, and one with some of the most popular titles - Mega Man 3-6,
+/// Super Mario Bros. 2 and 3, and Kirby's Adventure to name a few. A great well-rounded cartridge
+/// to handle most use cases, 4-way nametable mirroring, and even a scanline timer (wow).
+class NESDL_Mapper_4 : public NESDL_Mapper
+{
+public:
+    using NESDL_Mapper::NESDL_Mapper; // Inherit constructor(s)
+    virtual void InitROMData(uint8_t* prgROMData, uint8_t prgROMBanks, uint8_t* chrROMData, uint8_t chrROMBanks);
+    MirroringMode GetMirroringMode() { return mirroringMode; }
+    virtual uint8_t ReadByte(uint16_t addr);
+    virtual void WriteByte(uint16_t addr, uint8_t data);
+private:
+    void WriteControl();
+    void WriteCHRBank(uint8_t index);
+    void WritePRGBank();
     uint8_t shiftRegister;
     uint8_t shiftIndex;
     uint8_t prgROM0Index;   // PRG 16KB bank 1
@@ -93,7 +122,6 @@ public:
     virtual uint8_t ReadByte(uint16_t addr);
     virtual void WriteByte(uint16_t addr, uint8_t data);
 private:
-    MirroringMode mirroringMode;
     uint8_t prgROMIndex;    // PRG 8KB bank   (0x8000 - 0x9FFF)
     uint8_t chrROM0Index0;  // CHR 4KB bank 1 - Latch 0 0xFD (0x0000 - 0x0FFF)
     uint8_t chrROM0Index1;  // CHR 4KB bank 1 - Latch 0 0xFE (0x0000 - 0x0FFF)

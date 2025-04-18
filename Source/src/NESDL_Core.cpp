@@ -126,6 +126,9 @@ void NESDL_Core::LoadROM(const char* path)
         case 1:
             mapper = new NESDL_Mapper_1(this);
             break;
+        case 4:
+            mapper = new NESDL_Mapper_4(this);
+            break;
         case 9:
             mapper = new NESDL_Mapper_9(this);
             break;
