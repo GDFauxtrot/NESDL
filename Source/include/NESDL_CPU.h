@@ -22,6 +22,10 @@ struct CPURegisters
 
 #define STACK_PTR 0x0100
 
+#define ADDR_NMI 0xFFFA
+#define ADDR_RESET 0xFFFC
+#define ADDR_IRQ 0xFFFE
+
 // Bit masks for instruction addressing modes
 enum AddrMode { IMPLICIT, RELATIVEADDR, ACCUMULATOR, IMMEDIATE,
     ZEROPAGE, ZEROPAGEX, ZEROPAGEY, ABSOLUTEADDR, ABSOLUTEADDRX, ABSOLUTEADDRY,
@@ -48,6 +52,8 @@ public:
     bool nmi;
     bool delayNMI;
     bool dma;
+    bool irq;
+    bool delayIRQ;
     bool nextInstructionReady;
     bool showCPULogs;
 private:
@@ -116,7 +122,8 @@ private:
     void OP_TXS(uint8_t opcode, AddrMode mode);
     void OP_TYA(uint8_t opcode, AddrMode mode);
     void OP_KIL();
-    void NMI(); // NMI interrupt (special case)
+    void NMI(); // NMI interrupt
+    void IRQ(); // IRQ interrupt
     
     bool delayedDMA;
 	NESDL_Core* core;

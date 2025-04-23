@@ -18,8 +18,13 @@ void NESDL_CPU::Reset(bool hardReset)
         registers.y = 0;
         registers.sp = 0x00;
     }
-    registers.pc = 0xFFFC;
+    registers.pc = ADDR_RESET;
     registers.sp -= 3;
+
+    nmi = false;
+    delayNMI = false;
+    irq = false;
+    delayIRQ = false;
     
     // Ready P register in a unique way
     if (hardReset)
@@ -45,10 +50,12 @@ void NESDL_CPU::Update(uint32_t ppuCycles)
 {
     while (ppuCycleCounter >= 0)
     {
-        // Handle NMI
+        // Handle NMI/IRQ/DMA
         if (nmi && !delayNMI)
         {
             nmi = false;
+            irq = false;
+            delayIRQ = false;
             NMI();
         }
         else if (delayedDMA)
@@ -58,12 +65,22 @@ void NESDL_CPU::Update(uint32_t ppuCycles)
         }
         else
         {
+            if (irq && !delayIRQ)
+            {
+                //printf("\nIRQ CPU | %d->%d", irq, (irq && (registers.p & PSTATUS_INTERRUPTDISABLE) == 0));
+                if ((registers.p & PSTATUS_INTERRUPTDISABLE) == 0)
+                {
+                    irq = false;
+                    IRQ();
+                }
+            }
             if (dma)
             {
                 dma = false;
                 delayedDMA = true;
             }
             delayNMI = false;
+            delayIRQ = false;
             
             // Hack - we can predict a VBL occuring during this instruction, just... flip it on,
             // for timing accuracy purposes pls
@@ -1006,8 +1023,8 @@ void NESDL_CPU::OP_BRK(uint8_t opcode, AddrMode mode)
     // Push P onto stack
     core->ram->WriteByte(STACK_PTR + (registers.sp--), registers.p);
     // Read interrupt vector from FFFE/F into PC
-    uint16_t lsb = core->ram->ReadByte(0xFFFE);
-    uint16_t hsb = core->ram->ReadByte(0xFFFF) << 8;
+    uint16_t lsb = core->ram->ReadByte(ADDR_IRQ);
+    uint16_t hsb = core->ram->ReadByte(ADDR_IRQ+1) << 8;
     registers.pc = hsb + lsb;
     // Set break flag
     SetPSFlag(PSTATUS_BREAK, true);
@@ -1071,6 +1088,10 @@ void NESDL_CPU::OP_CLI(uint8_t opcode, AddrMode mode)
 {
     SetPSFlag(PSTATUS_INTERRUPTDISABLE, false);
     AdvanceCyclesForAddressMode(opcode, mode, false, false, false);
+    if (core->ppu->ignoreChanges = false)
+    {
+        delayIRQ = true;
+    }
 }
 
 void NESDL_CPU::OP_CLV(uint8_t opcode, AddrMode mode)
@@ -1340,6 +1361,10 @@ void NESDL_CPU::OP_PLP(uint8_t opcode, AddrMode mode)
     registers.p = stackVal;
     
     AdvanceCyclesForAddressMode(opcode, mode, false, false, false);
+    if (core->ppu->ignoreChanges = false)
+    {
+        delayIRQ = true;
+    }
 }
 
 void NESDL_CPU::OP_ROL(uint8_t opcode, AddrMode mode)
@@ -1445,6 +1470,10 @@ void NESDL_CPU::OP_SEI(uint8_t opcode, AddrMode mode)
 {
     SetPSFlag(PSTATUS_INTERRUPTDISABLE, true);
     AdvanceCyclesForAddressMode(opcode, mode, false, false, false);
+    if (core->ppu->ignoreChanges = false)
+    {
+        delayIRQ = true;
+    }
 }
 
 void NESDL_CPU::OP_STA(uint8_t opcode, AddrMode mode)
@@ -1556,8 +1585,31 @@ void NESDL_CPU::NMI()
     SetPSFlag(PSTATUS_INTERRUPTDISABLE, true);
     
     // Advance to address specified at NMI location (0xFFFA)
-    registers.pc = core->ram->ReadWord(0xFFFA);
+    registers.pc = core->ram->ReadWord(ADDR_NMI);
     
+    // Advance 7 cycles
+    elapsedCycles += 7;
+    ppuCycleCounter -= 21;
+}
+
+void NESDL_CPU::IRQ()
+{
+    // Push PC to stack
+    core->ram->WriteByte(STACK_PTR + (registers.sp--), (registers.pc >> 8));
+    core->ram->WriteByte(STACK_PTR + (registers.sp--), (uint8_t)registers.pc);
+
+    // Set break flag (before pushing P to stack)
+    SetPSFlag(PSTATUS_BREAK, false);
+
+    // Push P to stack
+    core->ram->WriteByte(STACK_PTR + (registers.sp--), registers.p);
+
+    // Set interrupt flag
+    SetPSFlag(PSTATUS_INTERRUPTDISABLE, true);
+
+    // Advance to address specified at IRQ location (0xFFFE)
+    registers.pc = core->ram->ReadWord(ADDR_IRQ);
+
     // Advance 7 cycles
     elapsedCycles += 7;
     ppuCycleCounter -= 21;

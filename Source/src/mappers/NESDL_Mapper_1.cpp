@@ -31,6 +31,7 @@ void NESDL_Mapper_1::InitROMData(uint8_t* prgROMData, uint8_t prgROMBanks, uint8
     chrROM0Index = 0;
     chrROM1Index = 1;
     
+    // TODO what is this flag for? Was this defined in MMC1 docs?
     prgRAMEnable = true;
 }
 

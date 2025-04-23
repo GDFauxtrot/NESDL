@@ -101,5 +101,8 @@
     <ClCompile Include="Source\src\NESDL_WinMenu.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Source\src\mappers\NESDL_Mapper_4.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

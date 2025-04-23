@@ -20,6 +20,7 @@ public:
     virtual uint8_t ReadByte(uint16_t addr) { return 0; }
     virtual void WriteByte(uint16_t addr, uint8_t data) {}
     
+    uint8_t mapperNumber;
     bool ignoreChanges;
 protected:
     NESDL_Core* core;
@@ -91,20 +92,24 @@ public:
     MirroringMode GetMirroringMode() { return mirroringMode; }
     virtual uint8_t ReadByte(uint16_t addr);
     virtual void WriteByte(uint16_t addr, uint8_t data);
+    void ClockIRQ();
 private:
-    void WriteControl();
-    void WriteCHRBank(uint8_t index);
-    void WritePRGBank();
-    uint8_t shiftRegister;
-    uint8_t shiftIndex;
-    uint8_t prgROM0Index;   // PRG 16KB bank 1
-    uint8_t prgROM1Index;   // PRG 16KB bank 2
-    uint8_t chrROM0Index;   // CHR  4KB bank 1
-    uint8_t chrROM1Index;   // CHR  4KB bank 2
-    uint8_t prgROMMode;
+    bool mirroringModeHardwired;
+    uint8_t prgROM0Index;   // PRG 8KB bank   (0x8000 - 0x9FFF or 0xC000 - 0xDFFF, toggleable)
+    uint8_t prgROM1Index;   // PRG 8KB bank   (0xA000 - 0xBFFF)
+    uint8_t chrROM0Index;   // CHR 2KB bank 1
+    uint8_t chrROM1Index;   // CHR 2KB bank 2
+    uint8_t chrROM2Index;   // CHR 1KB bank 3
+    uint8_t chrROM3Index;   // CHR 1KB bank 4
+    uint8_t chrROM4Index;   // CHR 1KB bank 5
+    uint8_t chrROM5Index;   // CHR 1KB bank 6
     uint8_t prgRAM[0x2000];
-    bool chrROMMode;
-    bool prgRAMEnable;
+    uint8_t bankRegisterMode;
+    uint8_t prgROMBankMode;
+    uint8_t chrA12Inversion;
+    bool irqEnabled;
+    uint8_t irqCounter;
+    uint8_t irqCounterReload;
 };
 
 /// iNES Header 09  - "MMC2" (Released October 1987, "Mike Tyson's Punch-Out!!" US)

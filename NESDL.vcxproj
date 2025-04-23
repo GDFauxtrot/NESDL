@@ -37,6 +37,7 @@
     <ClCompile Include="Source\include\NESDL_WinMenu.h" />
     <ClCompile Include="Source\src\mappers\NESDL_Mapper_0.cpp" />
     <ClCompile Include="Source\src\mappers\NESDL_Mapper_1.cpp" />
+    <ClCompile Include="Source\src\mappers\NESDL_Mapper_4.cpp" />
     <ClCompile Include="Source\src\mappers\NESDL_Mapper_9.cpp" />
     <ClCompile Include="Source\src\NESDL.cpp" />
     <ClCompile Include="Source\src\NESDL_APU.cpp" />

@@ -141,6 +141,7 @@ void NESDL_Core::LoadROM(const char* path)
             file.close();
             return;
     }
+    mapper->mapperNumber = mapperNum;
 
     // Read off the 16KB allocated PRG-ROM banks
     shared_ptr<vector<uint8_t>> prgROM;

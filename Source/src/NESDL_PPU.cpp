@@ -97,6 +97,55 @@ void NESDL_PPU::RunNextCycle()
         currentScanline = 0;
         currentFrame++;
     }
+
+    // MMC3 only: clock IRQ at certain times
+    if (mapper->mapperNumber == 4)
+    {
+        // 8x16 mode
+        if (registers.ctrl & PPUCTRL_SPRHEIGHT)
+        {
+            if (registers.ctrl & PPUCTRL_BGTILE && !(registers.ctrl & PPUCTRL_SPRTILE))
+            {
+                // If BG=0x1000 (& Spr = 0x0000), clock IRQ at PPU=324
+                if (currentScanlineCycle == 324)
+                {
+                    //printf("\nIRQ Clock (Scanline 324)");
+                    ((NESDL_Mapper_4*)mapper)->ClockIRQ();
+                }
+            }
+            else if (!(registers.ctrl & PPUCTRL_BGTILE) && registers.ctrl & PPUCTRL_SPRTILE)
+            {
+                // If BG=0x0000 (& Spr = 0x1000), clock IRQ at PPU=260
+                if (currentScanlineCycle == 260)
+                {
+                    //printf("\nIRQ Clock (Scanline 260)");
+                    ((NESDL_Mapper_4*)mapper)->ClockIRQ();
+                }
+            }
+        }
+        // 8x8 mode
+        else
+        {
+            if (registers.ctrl & PPUCTRL_BGTILE && !(registers.ctrl & PPUCTRL_SPRTILE))
+            {
+                // If BG=0x1000 (& Spr = 0x0000), clock IRQ at PPU=324
+                if (currentScanlineCycle == 324)
+                {
+                    //printf("\nIRQ Clock (Scanline 324)");
+                    ((NESDL_Mapper_4*)mapper)->ClockIRQ();
+                }
+            }
+            else if (!(registers.ctrl & PPUCTRL_BGTILE) && registers.ctrl & PPUCTRL_SPRTILE)
+            {
+                // If BG=0x0000 (& Spr = 0x1000), clock IRQ at PPU=260
+                if (currentScanlineCycle == 260)
+                {
+                    //printf("\nIRQ Clock (Scanline 260)");
+                    ((NESDL_Mapper_4*)mapper)->ClockIRQ();
+                }
+            }
+        }
+    }
 }
 
 void NESDL_PPU::HandleProcessVisibleScanline()
@@ -798,19 +847,47 @@ void NESDL_PPU::WriteToRegister(uint16_t registerAddr, uint8_t data)
             }
             else
             {
+                uint8_t lastHighV = registers.v >> 8;
                 // Low byte second
                 registers.t = (registers.t & 0xFF00) | data;
                 // Store completed 15-bit register into v
                 registers.v = registers.t;
+                uint8_t newHighV = registers.v >> 8;
+
+                // MMC3 only: if A12 (bit 12) goes 0->1 on write, trigger IRQ clock
+                if (mapper->mapperNumber == 4)
+                {
+                    if ((lastHighV & 0x10) == 0 && (newHighV & 0x10) != 0)
+                    {
+                        //printf("\nIRQ Clock (2006)");
+                        ((NESDL_Mapper_4*)mapper)->ClockIRQ();
+                    }
+                }
             }
             registers.w = !registers.w;
             break;
         case PPU_PPUDATA:
-            WriteToVRAM(registers.v, data);
-            // Increment v by the amount specified from PPUCTRL bit 2
-            if (incrementV)
             {
-                registers.v += (registers.ctrl & PPUCTRL_INCMODE) != 0 ? 32 : 1;
+                uint8_t lastHighV = registers.v >> 8;
+                WriteToVRAM(registers.v, data);
+
+                // Increment v by the amount specified from PPUCTRL bit 2
+                if (incrementV)
+                {
+                    registers.v += (registers.ctrl & PPUCTRL_INCMODE) != 0 ? 32 : 1;
+                }
+
+                uint8_t newHighV = registers.v >> 8;
+
+                // MMC3 only: if A12 (bit 12) goes 0->1 on write, trigger IRQ clock
+                if (mapper->mapperNumber == 4)
+                {
+                    if ((lastHighV & 0x10) == 0 && (newHighV & 0x10) != 0)
+                    {
+                        //printf("\nIRQ Clock (2007)");
+                        ((NESDL_Mapper_4*)mapper)->ClockIRQ();
+                    }
+                }
             }
             break;
         case PPU_OAMDMA:
@@ -899,6 +976,8 @@ uint8_t NESDL_PPU::ReadFromRegister(uint16_t registerAddr)
                     }
                     else
                     {
+                        uint8_t lastHighV = registers.v >> 8;
+
                         uint8_t vramData = ppuDataReadBuffer;
                         ppuDataReadBuffer = ReadFromVRAM(registers.v);
                         // Increment v by the amount specified from PPUCTRL bit 2
@@ -908,6 +987,18 @@ uint8_t NESDL_PPU::ReadFromRegister(uint16_t registerAddr)
                         }
                         // Put data onto open bus for return
                         ppuOpenBus = vramData;
+
+                        uint8_t newHighV = registers.v >> 8;
+
+                        // MMC3 only: if A12 (bit 12) goes 0->1 on write, trigger IRQ clock
+                        if (mapper->mapperNumber == 4)
+                        {
+                            if ((lastHighV & 0x10) == 0 && (newHighV & 0x10) != 0)
+                            {
+                                //printf("\nIRQ Clock (2007)");
+                                ((NESDL_Mapper_4*)mapper)->ClockIRQ();
+                            }
+                        }
                     }
                 }
             }

@@ -12,7 +12,7 @@ void NESDL_Mapper_0::InitROMData(uint8_t* prgROMData, uint8_t prgROMBanks, uint8
         memcpy(prgROM, prgROMData, prgBanks * 0x4000);
     }
     
-    // Init CHR-ROM Data
+    // Init CHR-ROM data
     if (chrBanks > 0)
     {
         chrROM = new uint8_t[chrBanks * 0x2000];
