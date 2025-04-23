@@ -34,7 +34,6 @@ void NESDL_PPU::Reset(bool hardReset)
     tileFetch.paletteIndex = 0;
     
     incrementV = true; // NESDL flag - a bit hacky though
-    ignoreChanges = false;
     oamN = 0;
     oamM = 0;
     secondaryOAMNextSlot = 0;
@@ -780,7 +779,7 @@ void NESDL_PPU::WriteToRegister(uint16_t registerAddr, uint8_t data)
     if ((!IsPPUReady() && (registerAddr == PPU_PPUCTRL ||
                          registerAddr == PPU_PPUMASK ||
                          registerAddr == PPU_PPUSCROLL ||
-                         registerAddr == PPU_PPUADDR)) || ignoreChanges)
+                         registerAddr == PPU_PPUADDR)) || core->cpu->ignoreChanges)
     {
         return;
     }
@@ -929,7 +928,7 @@ uint8_t NESDL_PPU::ReadFromRegister(uint16_t registerAddr)
         case PPU_PPUSTATUS:
             {
                 // Ignore VBL reset if operation is writing
-                if (ignoreChanges || isWriting)
+                if (core->cpu->ignoreChanges || isWriting)
                 {
                     ppuOpenBus = (ppuOpenBus & 0x1F) + (registers.status & 0xE0);
                 }
@@ -962,7 +961,7 @@ uint8_t NESDL_PPU::ReadFromRegister(uint16_t registerAddr)
         case PPU_PPUDATA:
             // We return data stored in the PPUDATA buffer rather than VRAM directly
             {
-                if (ignoreChanges)
+                if (core->cpu->ignoreChanges)
                 {
                     return ppuDataReadBuffer;
                 }

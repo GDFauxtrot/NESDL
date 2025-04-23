@@ -1,10 +1,10 @@
 #include "NESDL.h"
 
+
 void NESDL_CPU::Init(NESDL_Core* c)
 {
     core = c;
     addrModeResult = new AddressModeResult();
-	showCPULogs = true;
 }
 
 void NESDL_CPU::Reset(bool hardReset)
@@ -44,6 +44,8 @@ void NESDL_CPU::Reset(bool hardReset)
 
     // Get how long our next (first) instruction will take
     nextInstructionPPUCycles = GetCyclesForNextInstruction() * 3;
+
+    nintendulatorLogIndex = 0;
 }
 
 void NESDL_CPU::Update(uint32_t ppuCycles)
@@ -94,8 +96,24 @@ void NESDL_CPU::Update(uint32_t ppuCycles)
                 }
             }
             
-            if (showCPULogs)
+			if (nintendulatorDebugging)
             {
+				// Construct and store CPU state before running next instruction
+
+				// Compare state to Nintendulator line - if it's off, we can print
+				// a line comparison and try to debug
+				string nintendulatorLine = nintendulatorLog[nintendulatorLogIndex];
+
+				// The "quickest" way I could think of validating against Nintendulator is
+				// comparing string-to-string outright
+				string ourCurrentLine = DebugMakeCurrentStateLine();
+
+				if (ourCurrentLine != nintendulatorLine)
+				{
+					printf("\nLines differ!\nOurs:%s\nTheirs:%s\n", ourCurrentLine.c_str(), nintendulatorLine.c_str());
+				}
+
+				nintendulatorLogIndex++;
                 // Debug Nintendulator format
                 //printf("\n%04X  %02X\t\t\t\t\t\tA:%02X X:%02X Y:%02X P:%02X SP:%02X PPU:%3d,%3d CYC:%llu", registers.pc, core->ram->ReadByte(registers.pc), registers.a, registers.x, registers.y, registers.p, registers.sp, core->ppu->currentScanline, core->ppu->currentScanlineCycle, elapsedCycles);
             }
@@ -105,6 +123,13 @@ void NESDL_CPU::Update(uint32_t ppuCycles)
 
             // Figure out how long our new next instruction will take
             nextInstructionPPUCycles = GetCyclesForNextInstruction() * 3;
+
+			if (nintendulatorDebugging)
+			{
+				// Check next instruction time against next Nintendulator line
+				// We can catch an inconsistency before it happens and debug more thoroughly!
+
+			}
             
             wasLastInstructionAMapperWrite = didMapperWrite;
             didMapperWrite = false;
@@ -124,15 +149,9 @@ uint8_t NESDL_CPU::GetCyclesForNextInstruction()
     // TODO
     // Well... a better solution to this would be nice. It helps to simulate the
     // next instruction to figure out timing, but WOW what a mess this is.
-    core->ppu->ignoreChanges = true;
-    core->ram->ignoreChanges = true;
-    core->input->ignoreChanges = true;
-    core->mapper->ignoreChanges = true;
+	ignoreChanges = true;
     RunNextInstruction();
-    core->mapper->ignoreChanges = false;
-    core->ppu->ignoreChanges = false;
-    core->ram->ignoreChanges = false;
-    core->input->ignoreChanges = false;
+	ignoreChanges = false;
     registers = regState;
     uint8_t result = (uint8_t)(elapsedCycles - prevElapsedCycles); // No cycle counting ever goes above 255
     elapsedCycles = prevElapsedCycles;
@@ -1088,7 +1107,7 @@ void NESDL_CPU::OP_CLI(uint8_t opcode, AddrMode mode)
 {
     SetPSFlag(PSTATUS_INTERRUPTDISABLE, false);
     AdvanceCyclesForAddressMode(opcode, mode, false, false, false);
-    if (core->ppu->ignoreChanges = false)
+    if (ignoreChanges == false)
     {
         delayIRQ = true;
     }
@@ -1361,7 +1380,7 @@ void NESDL_CPU::OP_PLP(uint8_t opcode, AddrMode mode)
     registers.p = stackVal;
     
     AdvanceCyclesForAddressMode(opcode, mode, false, false, false);
-    if (core->ppu->ignoreChanges = false)
+    if (ignoreChanges == false)
     {
         delayIRQ = true;
     }
@@ -1470,7 +1489,7 @@ void NESDL_CPU::OP_SEI(uint8_t opcode, AddrMode mode)
 {
     SetPSFlag(PSTATUS_INTERRUPTDISABLE, true);
     AdvanceCyclesForAddressMode(opcode, mode, false, false, false);
-    if (core->ppu->ignoreChanges = false)
+    if (ignoreChanges == false)
     {
         delayIRQ = true;
     }
@@ -1637,4 +1656,40 @@ void NESDL_CPU::DidMapperWrite()
 bool NESDL_CPU::IsConsecutiveMapperWrite()
 {
     return wasLastInstructionAMapperWrite;
+}
+
+void NESDL_CPU::DebugBindNintendulator(const char* path)
+{
+    if (nintendulatorDebugging)
+    {
+        nintendulatorLog.clear();
+    }
+
+    ifstream logStream;
+    logStream.open(path);
+    
+    string line;
+    while (getline(logStream, line))
+    {
+        nintendulatorLog.push_back(line);
+    }
+
+    logStream.close();
+
+    nintendulatorDebugging = true;
+    nintendulatorLogIndex = 0;
+}
+
+string NESDL_CPU::DebugMakeCurrentStateLine()
+{
+    string returnStr;
+
+    // Something to help us is the cached addrModeResult from simulating the next instruction
+    // our memory fetches were already done for us!
+
+    returnStr.append(string_format("%04X", registers.pc));
+
+	// TODO build the byte-to-AddrMode map... refactor the entire CPU table while we're at it
+
+    return returnStr;
 }

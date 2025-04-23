@@ -38,7 +38,7 @@ uint8_t NESDL_Mapper_9::ReadByte(uint16_t addr)
             data = chrROM[index * 0x1000 + addr];
         }
         
-        if (!ignoreChanges)
+        if (!core->cpu->ignoreChanges)
         {
             uint8_t tile = (addr >> 4);
             // Update latch (for latch 0 - ONLY when address ends in 0x8!)
@@ -62,7 +62,7 @@ uint8_t NESDL_Mapper_9::ReadByte(uint16_t addr)
             data = chrROM[index * 0x1000 + (addr - 0x1000)];
         }
         
-        if (!ignoreChanges)
+        if (!core->cpu->ignoreChanges)
         {
             uint8_t tile = (addr >> 4);
             // Update latch (for latch 1 - ONLY when address ends in value >= 0x8!)
@@ -99,7 +99,7 @@ uint8_t NESDL_Mapper_9::ReadByte(uint16_t addr)
 
 void NESDL_Mapper_9::WriteByte(uint16_t addr, uint8_t data)
 {
-    if (ignoreChanges)
+    if (core->cpu->ignoreChanges)
     {
         return;
     }

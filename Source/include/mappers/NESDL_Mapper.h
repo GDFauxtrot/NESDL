@@ -21,7 +21,6 @@ public:
     virtual void WriteByte(uint16_t addr, uint8_t data) {}
     
     uint8_t mapperNumber;
-    bool ignoreChanges;
 protected:
     NESDL_Core* core;
     MirroringMode mirroringMode;

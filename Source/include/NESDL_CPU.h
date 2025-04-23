@@ -37,16 +37,30 @@ struct AddressModeResult
     uint8_t value;
 };
 
+struct DebugCPUState
+{
+	uint64_t elapsedCycles;
+	CPURegisters registers;
+	uint16_t ppuScanline;
+	uint16_t ppuScanlineCycle;
+	uint8_t nextOpcode;
+	uint8_t nextParam0;
+	uint8_t nextParam1;
+	AddrMode nextAddrMode;
+};
+
 class NESDL_CPU
 {
 public:
-	void Init(NESDL_Core* c);
+    void Init(NESDL_Core* c);
     void Reset(bool hardReset);
-	void Update(uint32_t ppuCycles);
+    void Update(uint32_t ppuCycles);
     void DidMapperWrite();
     bool IsConsecutiveMapperWrite();
     void HaltCPUForDMC();
     
+    void DebugBindNintendulator(const char* path);
+
     uint64_t elapsedCycles;
     CPURegisters registers;
     bool nmi;
@@ -55,7 +69,8 @@ public:
     bool irq;
     bool delayIRQ;
     bool nextInstructionReady;
-    bool showCPULogs;
+
+    bool ignoreChanges;
 private:
     void RunNextInstruction();
     void SetPSFlag(uint8_t flag, bool on);
@@ -124,13 +139,20 @@ private:
     void OP_KIL();
     void NMI(); // NMI interrupt
     void IRQ(); // IRQ interrupt
-    
+
+	string DebugMakeCurrentStateLine();
+
     bool delayedDMA;
-	NESDL_Core* core;
+    NESDL_Core* core;
     AddressModeResult* addrModeResult;
     int16_t ppuCycleCounter;
     uint8_t nextInstructionPPUCycles;
     
     bool didMapperWrite;
     bool wasLastInstructionAMapperWrite; // Not happy with this, but needed
+
+    DebugCPUState debugCPUState;
+    bool nintendulatorDebugging;
+    vector<string> nintendulatorLog;
+    int nintendulatorLogIndex;
 };

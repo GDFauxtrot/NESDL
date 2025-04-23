@@ -50,6 +50,7 @@ public:
     void Action_DebugShowCPU();
     void Action_DebugShowPPU();
     void Action_DebugShowNT();
+    void Action_AttachNintendulatorLog();
     
     NESDL_CPU* cpu;
     NESDL_PPU* ppu;
@@ -60,6 +61,7 @@ public:
     
     bool romLoaded;
     bool paused;
+
 private:
     NESDL_SDL* sdlCtx;
     

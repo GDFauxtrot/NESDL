@@ -4,7 +4,6 @@ void NESDL_RAM::Init(NESDL_Core* c)
 {
     core = c;
     oops = false;
-    ignoreChanges = false;
 }
 
 uint8_t NESDL_RAM::ReadByte(uint16_t addr)
@@ -70,7 +69,7 @@ uint16_t NESDL_RAM::ReadWord(uint16_t addr)
 
 void NESDL_RAM::WriteByte(uint16_t addr, uint8_t data)
 {
-    if (ignoreChanges)
+    if (core->cpu->ignoreChanges)
     {
         return;
     }

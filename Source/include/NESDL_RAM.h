@@ -11,7 +11,6 @@ public:
     void SetMapper(NESDL_Mapper* m);
     
     bool oops;
-    bool ignoreChanges;
 private:
     NESDL_Core* core;
     NESDL_Mapper* mapper;

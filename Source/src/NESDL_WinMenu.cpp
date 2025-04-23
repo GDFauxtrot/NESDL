@@ -22,6 +22,15 @@
 #define ID_DBUG_STEPFRM	303
 #define ID_DBUG_STEPCPU	304
 #define ID_DBUG_STEPPPU	305
+#define ID_DBUG_NINTLOG	306
+
+// 1) Add "Open Nintendulator log..." option
+// 2) Load file, parse via newlines
+// 3) Index to log initialized at 0 (first line)
+// 4) Every CPU instruction, read the line and compare to current info
+// 5) If false, printf or something
+// 6) Advance index after CPU instruction happens
+// 7) Reset index on ROM reset/load
 
 void NESDL_WinMenu::Initialize(SDL_Window* window)
 {
@@ -66,6 +75,7 @@ void NESDL_WinMenu::Initialize(SDL_Window* window)
     AppendMenu(debugMenu, MF_STRING, ID_DBUG_STEPFRM, L"Step (Frame)");
     AppendMenu(debugMenu, MF_STRING, ID_DBUG_STEPCPU, L"Step (CPU)");
     AppendMenu(debugMenu, MF_STRING, ID_DBUG_STEPPPU, L"Step (PPU)");
+    AppendMenu(debugMenu, MF_STRING, ID_DBUG_NINTLOG, L"Attach Nintendulator Log...");
 
     // attach menu bar to the window
     SetMenu(hwnd, mainMenu);
@@ -131,6 +141,9 @@ void NESDL_WinMenu::HandleWindowEvent(int eventId, NESDL_Core* core)
             break;
         case ID_DBUG_STEPPPU:
             core->Action_DebugStepPPU();
+            break;
+        case ID_DBUG_NINTLOG:
+            core->Action_AttachNintendulatorLog();
             break;
     }
 }

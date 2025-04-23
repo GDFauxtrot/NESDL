@@ -113,7 +113,6 @@ public:
     uint8_t frameDataSprite[NESDL_SCREEN_WIDTH * NESDL_SCREEN_HEIGHT]; // Some per-pixel data
     uint32_t ntFrameData[0x1000]; // Frame buffer
 
-    bool ignoreChanges;
     bool incrementV;
     bool isWriting;
     uint64_t currentFrame;

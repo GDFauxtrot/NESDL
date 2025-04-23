@@ -1,6 +1,5 @@
 #include "NESDL.h"
 #include <memory>
-#include <fstream>
 #ifdef _WIN32
 #include "../src/nfd/nfd.h"
 #else
@@ -210,7 +209,7 @@ void NESDL_Core::Action_ShowAbout()
 
 void NESDL_Core::Action_OpenROM()
 {
-    nfdchar_t *romFilePath = NULL;
+    nfdchar_t* romFilePath = NULL;
     nfdresult_t result = NFD_OpenDialog("nes", NULL, &romFilePath);
     // Don't continue if we didn't successfully choose a file, or (somehow) it's empty
     if (result != NFD_OKAY || strcmp(romFilePath, "") == 0)
@@ -303,4 +302,18 @@ void NESDL_Core::Action_DebugShowPPU()
 void NESDL_Core::Action_DebugShowNT()
 {
     sdlCtx->ToggleShowNT();
+}
+void NESDL_Core::Action_AttachNintendulatorLog()
+{
+	nfdchar_t* logFilePath = NULL;
+	nfdresult_t result = NFD_OpenDialog("debug", NULL, &logFilePath);
+	// Don't continue if we didn't successfully choose a file, or (somehow) it's empty
+	if (result != NFD_OKAY || strcmp(logFilePath, "") == 0)
+	{
+		return;
+	}
+	else
+	{
+		cpu->DebugBindNintendulator(logFilePath);
+	}
 }

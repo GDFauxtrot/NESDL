@@ -22,7 +22,6 @@ public:
     uint8_t PlayerInputToByte(bool isPlayer2);
     bool GetNextPlayerInputBit(bool isPlayer2);
     void SetReadInputStrobe(bool strobe);
-    bool ignoreChanges;
 private:
     bool GetPlayerInputBit(uint8_t index, bool isPlayer2);
     

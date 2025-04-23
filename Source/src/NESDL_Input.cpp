@@ -11,7 +11,7 @@ void NESDL_Input::Init(NESDL_Core* c)
 
 void NESDL_Input::SetControllerConnected(bool connected, bool isPlayer2)
 {
-    if (ignoreChanges)
+    if (core->cpu->ignoreChanges)
     {
         return;
     }
@@ -28,7 +28,7 @@ void NESDL_Input::SetControllerConnected(bool connected, bool isPlayer2)
 
 void NESDL_Input::RegisterKey(SDL_KeyCode keyCode, bool keyDown)
 {
-    if (ignoreChanges)
+    if (core->cpu->ignoreChanges)
     {
         return;
     }
@@ -91,7 +91,7 @@ uint8_t NESDL_Input::PlayerInputToByte(bool isPlayer2)
 
 void NESDL_Input::SetReadInputStrobe(bool strobe)
 {
-    if (ignoreChanges)
+    if (core->cpu->ignoreChanges)
     {
         return;
     }
@@ -111,7 +111,7 @@ bool NESDL_Input::GetNextPlayerInputBit(bool isPlayer2)
     if (player.connected)
     {
         bool result = GetPlayerInputBit(readInputStrobe == true ? 0 : readBit, isPlayer2);
-        if (!ignoreChanges)
+        if (!core->cpu->ignoreChanges)
         {
             readBit++;
         }

@@ -21,6 +21,7 @@
 #include "NESDL_WinMenu.h"
 #endif
 
+#include <fstream>
 #include <string>
 #include <sstream>
 #include <vector>
