@@ -12,7 +12,6 @@ void NESDL_CPU::Reset(bool hardReset)
     if (hardReset)
     {
         elapsedCycles = 0;
-        
         registers.a = 0;
         registers.x = 0;
         registers.y = 0;
@@ -21,11 +20,6 @@ void NESDL_CPU::Reset(bool hardReset)
     registers.pc = ADDR_RESET;
     registers.sp -= 3;
 
-    nmi = false;
-    delayNMI = false;
-    irq = false;
-    delayIRQ = false;
-    
     // Ready P register in a unique way
     if (hardReset)
     {
@@ -35,7 +29,12 @@ void NESDL_CPU::Reset(bool hardReset)
     {
         registers.p = registers.p & PSTATUS_INTERRUPTDISABLE;
     }
-    
+
+    nmi = false;
+    delayNMI = false;
+    irq = false;
+    delayIRQ = false;
+
     // With the CPU state reset, prime the CPU for program execution
     // CPU warms up for 7 cycles and fetches the start address to PC
     ppuCycleCounter = 0;
@@ -43,6 +42,7 @@ void NESDL_CPU::Reset(bool hardReset)
     elapsedCycles += 7;
 
     // Get how long our next (first) instruction will take
+    // (Also primes addrModeResult for debugging)
     nextInstructionPPUCycles = GetCyclesForNextInstruction() * 3;
 
     nintendulatorLogIndex = 0;
@@ -67,15 +67,9 @@ void NESDL_CPU::Update(uint32_t ppuCycles)
         }
         else
         {
-            if (irq && !delayIRQ)
-            {
-                //printf("\nIRQ CPU | %d->%d", irq, (irq && (registers.p & PSTATUS_INTERRUPTDISABLE) == 0));
-                if ((registers.p & PSTATUS_INTERRUPTDISABLE) == 0)
-                {
-                    irq = false;
-                    IRQ();
-                }
-            }
+            bool irqReadyToFire = irq && !delayIRQ && (registers.p & PSTATUS_INTERRUPTDISABLE) == 0;
+            uint64_t prevElapsedCycles = elapsedCycles;
+
             if (dma)
             {
                 dma = false;
@@ -96,41 +90,56 @@ void NESDL_CPU::Update(uint32_t ppuCycles)
                 }
             }
             
-			if (nintendulatorDebugging)
+            if (nintendulatorDebugging)
             {
-				// Construct and store CPU state before running next instruction
-
-				// Compare state to Nintendulator line - if it's off, we can print
-				// a line comparison and try to debug
-				string nintendulatorLine = nintendulatorLog[nintendulatorLogIndex];
-
-				// The "quickest" way I could think of validating against Nintendulator is
-				// comparing string-to-string outright
 				string ourCurrentLine = DebugMakeCurrentStateLine();
+				//printf("\n%s", ourCurrentLine.c_str());
+                if (nintendulatorLogIndex < nintendulatorLogCount)
+                {
+                    // Construct and store CPU state before running next instruction
 
-				if (ourCurrentLine != nintendulatorLine)
-				{
-					printf("\nLines differ!\nOurs:%s\nTheirs:%s\n", ourCurrentLine.c_str(), nintendulatorLine.c_str());
-				}
+                    // Compare state to Nintendulator line - if it's off, we can print
+                    // a line comparison and try to debug
+                    string nintendulatorLine = nintendulatorLog[nintendulatorLogIndex];
 
-				nintendulatorLogIndex++;
+                    // The "quickest" way I could think of validating against Nintendulator is
+                    // comparing string-to-string outright
+                    if (ourCurrentLine != nintendulatorLine)
+                    {
+                        printf("\nLines differ!\n  Ours:%s\nTheirs:%s\n", ourCurrentLine.c_str(), nintendulatorLine.c_str());
+                    }
+                    nintendulatorLogIndex++;
+                }
+                else if (nintendulatorLogIndex == nintendulatorLogCount)
+                {
+                    printf("Nintendulator out of lines!\n");
+                }
             }
 
             // Debug Nintendulator format
             //printf("\n%04X  %02X\t\t\t\t\t\tA:%02X X:%02X Y:%02X P:%02X SP:%02X PPU:%3d,%3d CYC:%llu", registers.pc, core->ram->ReadByte(registers.pc), registers.a, registers.x, registers.y, registers.p, registers.sp, core->ppu->currentScanline, core->ppu->currentScanlineCycle, elapsedCycles);
-            //printf("\n%s", DebugMakeCurrentStateLine().c_str());
+            printf("\n%s", DebugMakeCurrentStateLine().c_str());
 
             ppuCycleCounter -= nextInstructionPPUCycles;
             RunNextInstruction();
 
-            // Figure out how long our new next instruction will take
-            nextInstructionPPUCycles = GetCyclesForNextInstruction() * 3;
-
-			if (nintendulatorDebugging)
-			{
-				// Check next instruction time against next Nintendulator line
-				// We can catch an inconsistency before it happens and debug more thoroughly!
-			}
+            if (irqReadyToFire)
+            {
+                irq = false;
+                delayIRQ = false;
+                elapsedCycles = prevElapsedCycles;
+                IRQ();
+            }
+            else
+            {
+                // Figure out how long our new next instruction will take
+                nextInstructionPPUCycles = GetCyclesForNextInstruction() * 3;
+            }
+            if (nintendulatorDebugging)
+            {
+                // Check next instruction time against next Nintendulator line
+                // We can catch an inconsistency before it happens and debug more thoroughly!
+            }
             
             wasLastInstructionAMapperWrite = didMapperWrite;
             didMapperWrite = false;
@@ -150,9 +159,9 @@ uint8_t NESDL_CPU::GetCyclesForNextInstruction()
     // TODO
     // Well... a better solution to this would be nice. It helps to simulate the
     // next instruction to figure out timing, but WOW what a mess this is.
-	ignoreChanges = true;
+    ignoreChanges = true;
     RunNextInstruction();
-	ignoreChanges = false;
+    ignoreChanges = false;
     registers = regState;
     uint8_t result = (uint8_t)(elapsedCycles - prevElapsedCycles); // No cycle counting ever goes above 255
     elapsedCycles = prevElapsedCycles;
@@ -1466,19 +1475,36 @@ void NESDL_CPU::DebugBindNintendulator(const char* path)
         nintendulatorLog.clear();
     }
 
+    printf("Attaching Nintendulator log: %s\n", path);
+
     ifstream logStream;
     logStream.open(path);
     
     string line;
+    uint64_t lineCount = 0;
     while (getline(logStream, line))
     {
         nintendulatorLog.push_back(line);
+        lineCount++;
     }
 
     logStream.close();
 
     nintendulatorDebugging = true;
     nintendulatorLogIndex = 0;
+    nintendulatorLogCount = lineCount;
+
+    printf("Attachment done! (%llu lines)", lineCount);
+}
+
+void NESDL_CPU::DebugUnbindNintendulator()
+{
+    if (nintendulatorDebugging)
+    {
+        nintendulatorLog.clear();
+        nintendulatorDebugging = false;
+        printf("Detached Nintendulator log.");
+    }
 }
 
 string NESDL_CPU::DebugMakeCurrentStateLine()
@@ -1486,18 +1512,35 @@ string NESDL_CPU::DebugMakeCurrentStateLine()
     static stringstream returnStr;
     returnStr.str("");
 
+    // Memory reads cause side effects, we need to flag that we don't want those
     ignoreChanges = true;
 
-    // Something to help us is the cached addrModeResult from simulating the next instruction
-    // our memory fetches were already done for us!
+    // Something to help us is the cached addrModeResult from simulating the next instruction.
+    // Our memory fetches were already done for us!
 
     returnStr << string_format("%04X  ", registers.pc);
     uint8_t opcode = core->ram->ReadByte(registers.pc);
     uint8_t param0 = core->ram->ReadByte(registers.pc+1);
     uint8_t param1 = core->ram->ReadByte(registers.pc+2);
     const char* opcodeStr = CPU_OPCODE_STR[CPU_OPCODES[opcode]];
+    uint16_t readAddr = addrModeResult->address;
+    uint8_t readValue = addrModeResult->value;
 
-    switch (CPU_ADDRMODES[opcode])
+    AddrMode nextInstructionMode = CPU_ADDRMODES[opcode];
+
+    // Nintendulator is particular about reads to some addresses like PPU and controller
+    // the "actual" value isn't retrieved, but the underlying bytes in RAM. I've never seen it not be 0xFF
+    if (nextInstructionMode == AddrMode::ABSOLUTEADDR ||
+        nextInstructionMode == AddrMode::ABSOLUTEX ||
+        nextInstructionMode == AddrMode::ABSOLUTEY)
+    {
+        uint16_t addr = ((uint16_t)param1 << 8) | param0;
+        if (addr >= 0x2000 && addr < 0x4020)
+        {
+            readValue = 0xFF;
+        }
+    }
+    switch (nextInstructionMode)
     {
         case AddrMode::ACCUMULATOR:
         case AddrMode::IMPLICIT:
@@ -1508,62 +1551,70 @@ string NESDL_CPU::DebugMakeCurrentStateLine()
         }
         case AddrMode::RELATIVEADDR:
         {
+            // Add 2 since it's relative to PC after advancing 2 bytes (aka this instruction)
             returnStr << string_format("%02X %02X     ", opcode, param0) << opcodeStr;
-            returnStr << string_format(" $%04X                       ", (registers.pc + (int8_t)addrModeResult->value));
+            returnStr << string_format(" $%04X                       ", (registers.pc + (int8_t)readValue + 2));
             break;
         }
         case AddrMode::IMMEDIATE:
         {
             returnStr << string_format("%02X %02X     ", opcode, param0) << opcodeStr;
-            returnStr << string_format(" #$%02X                        ", addrModeResult->value);
+            returnStr << string_format(" #$%02X                        ", readValue);
             break;
         }
         case AddrMode::ZEROPAGE:
         {
             returnStr << string_format("%02X %02X     ", opcode, param0) << opcodeStr;
-            returnStr << string_format(" $%02X = %02X                    ", param0, addrModeResult->value);
+            returnStr << string_format(" $%02X = %02X                    ", param0, readValue);
             break;
         }
         case AddrMode::ZEROPAGEX:
         {
             returnStr << string_format("%02X %02X     ", opcode, param0) << opcodeStr;
-            returnStr << string_format(" $%02X,X @ %02X = %02X             ", param0, addrModeResult->address, addrModeResult->value);
+            returnStr << string_format(" $%02X,X @ %02X = %02X             ", param0, readAddr, readValue);
             break;
         }
         case AddrMode::ZEROPAGEY:
         {
             returnStr << string_format("%02X %02X     ", opcode, param0) << opcodeStr;
-            returnStr << string_format(" $%02X,Y @ %02X = %02X             ", param0, addrModeResult->address, addrModeResult->value);
+            returnStr << string_format(" $%02X,Y @ %02X = %02X             ", param0, readAddr, readValue);
             break;
         }
         case AddrMode::ABSOLUTEADDR:
         {
             returnStr << string_format("%02X %02X %02X  ", opcode, param0, param1) << opcodeStr;
-            returnStr << string_format(" $%02X%02X                       ", param1, param0);
+            if (opcode == 0x20)
+            {
+                returnStr << string_format(" $%02X%02X                       ", param1, param0);
+            }
+            else
+            {
+                returnStr << string_format(" $%02X%02X = %02X                  ", param1, param0, readValue);
+            }
             break;
         }
         case AddrMode::ABSOLUTEX:
         {
             returnStr << string_format("%02X %02X %02X  ", opcode, param0, param1) << opcodeStr;
-            returnStr << string_format(" $%02X%02X,X @ %04X = %02X         ", param1, param0, addrModeResult->address, addrModeResult->value);
+            returnStr << string_format(" $%02X%02X,X @ %04X = %02X         ", param1, param0, readAddr, readValue);
             break;
         }
         case AddrMode::ABSOLUTEY:
         {
             returnStr << string_format("%02X %02X %02X  ", opcode, param0, param1) << opcodeStr;
-            returnStr << string_format(" $%02X%02X,Y @ %04X = %02X         ", param1, param0, addrModeResult->address, addrModeResult->value);
+            returnStr << string_format(" $%02X%02X,Y @ %04X = %02X         ", param1, param0, readAddr, readValue);
             break;
         }
         case AddrMode::INDIRECTX:
         {
             returnStr << string_format("%02X %02X     ", opcode, param0) << opcodeStr;
-            returnStr << string_format(" ($%02X,X) = %04X @ %04X = %02X  ", param0, (addrModeResult->address - registers.x), addrModeResult->address, addrModeResult->value);
+            returnStr << string_format(" ($%02X,X) = %04X @ %04X = %02X  ", param0, (readAddr - registers.x), readAddr, readValue);
             break;
         }
         case AddrMode::INDIRECTY:
         {
             returnStr << string_format("%02X %02X     ", opcode, param0) << opcodeStr;
-            returnStr << string_format(" ($%02X),Y = %04X @ %04X = %02X  ", param0, (addrModeResult->address - registers.y), addrModeResult->address, addrModeResult->value);
+            returnStr << string_format(" ($%02X),Y = %04X @ %04X = %02X  ", param0, (readAddr - registers.y), readAddr, readValue);
             break;
         }
     }

@@ -51,14 +51,15 @@ public:
     void Action_DebugShowPPU();
     void Action_DebugShowNT();
     void Action_AttachNintendulatorLog();
-    
+    void Action_DetachNintendulatorLog();
+
     NESDL_CPU* cpu;
     NESDL_PPU* ppu;
     NESDL_RAM* ram;
     NESDL_APU* apu;
     NESDL_Input* input;
     NESDL_Mapper* mapper;
-    
+
     bool romLoaded;
     bool paused;
 

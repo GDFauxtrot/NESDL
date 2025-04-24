@@ -305,15 +305,19 @@ void NESDL_Core::Action_DebugShowNT()
 }
 void NESDL_Core::Action_AttachNintendulatorLog()
 {
-	nfdchar_t* logFilePath = NULL;
-	nfdresult_t result = NFD_OpenDialog("debug", NULL, &logFilePath);
-	// Don't continue if we didn't successfully choose a file, or (somehow) it's empty
-	if (result != NFD_OKAY || strcmp(logFilePath, "") == 0)
-	{
-		return;
-	}
-	else
-	{
-		cpu->DebugBindNintendulator(logFilePath);
-	}
+    nfdchar_t* logFilePath = NULL;
+    nfdresult_t result = NFD_OpenDialog("debug", NULL, &logFilePath);
+    // Don't continue if we didn't successfully choose a file, or (somehow) it's empty
+    if (result != NFD_OKAY || strcmp(logFilePath, "") == 0)
+    {
+        return;
+    }
+    else
+    {
+        cpu->DebugBindNintendulator(logFilePath);
+    }
+}
+void NESDL_Core::Action_DetachNintendulatorLog()
+{
+    cpu->DebugUnbindNintendulator();
 }

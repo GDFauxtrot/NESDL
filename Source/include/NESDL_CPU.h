@@ -26,11 +26,12 @@ struct CPURegisters
 #define ADDR_RESET 0xFFFC
 #define ADDR_IRQ 0xFFFE
 
-// Bit masks for instruction addressing modes
+// 6502 instruction addressing modes
 enum AddrMode { IMPLICIT, RELATIVEADDR, ACCUMULATOR, IMMEDIATE,
     ZEROPAGE, ZEROPAGEX, ZEROPAGEY, ABSOLUTEADDR, ABSOLUTEX, ABSOLUTEY,
     INDIRECTX, INDIRECTY };
 
+// 6502 instructions
 enum Opcode {
     // Official
     ADC, AND, ASL, BCC, BCS, BEQ, BIT, BMI, BNE, BPL, BRK, BVC, BVS, CLC,
@@ -41,6 +42,8 @@ enum Opcode {
     KIL
 };
 
+// List of 6502 opcode strings, organized by Opcode enum value.
+// (Opcode enum and this table must be aligned!)
 static const char* CPU_OPCODE_STR[57] =
 {
     // Official
@@ -60,16 +63,17 @@ struct AddressModeResult
 
 struct DebugCPUState
 {
-	uint64_t elapsedCycles;
-	CPURegisters registers;
-	uint16_t ppuScanline;
-	uint16_t ppuScanlineCycle;
-	uint8_t nextOpcode;
-	uint8_t nextParam0;
-	uint8_t nextParam1;
-	AddrMode nextAddrMode;
+    uint64_t elapsedCycles;
+    CPURegisters registers;
+    uint16_t ppuScanline;
+    uint16_t ppuScanlineCycle;
+    uint8_t nextOpcode;
+    uint8_t nextParam0;
+    uint8_t nextParam1;
+    AddrMode nextAddrMode;
 };
 
+// List of 6502 instruction address modes, organized by byte value. Corresponds bytes with an AddrMode enum
 const AddrMode CPU_ADDRMODES[0x100] =
 {
     // 0x00
@@ -154,6 +158,7 @@ const AddrMode CPU_ADDRMODES[0x100] =
     AddrMode::IMPLICIT,     AddrMode::ABSOLUTEX,    AddrMode::ABSOLUTEX,    AddrMode::ABSOLUTEX
 };
 
+// List of 6502 instructions, organized by byte value. Corresponds bytes with an Opcode enum
 const Opcode CPU_OPCODES[0x100] =
 {
     // 0x00
@@ -215,8 +220,9 @@ public:
     void DidMapperWrite();
     bool IsConsecutiveMapperWrite();
     void HaltCPUForDMC();
-    
+
     void DebugBindNintendulator(const char* path);
+    void DebugUnbindNintendulator();
 
     uint64_t elapsedCycles;
     CPURegisters registers;
@@ -297,7 +303,7 @@ private:
     void NMI(); // NMI interrupt
     void IRQ(); // IRQ interrupt
 
-	string DebugMakeCurrentStateLine();
+    string DebugMakeCurrentStateLine();
 
     bool delayedDMA;
     NESDL_Core* core;
@@ -311,5 +317,6 @@ private:
     DebugCPUState debugCPUState;
     bool nintendulatorDebugging;
     vector<string> nintendulatorLog;
-    int nintendulatorLogIndex;
+    uint64_t nintendulatorLogIndex;
+    uint64_t nintendulatorLogCount;
 };

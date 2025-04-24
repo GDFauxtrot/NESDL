@@ -10,9 +10,9 @@ void NESDL_PPU::Reset(bool hardReset)
     elapsedCycles = 21;
     currentFrame = 0;
     currentScanline = 0;
-    currentScanlineCycle = 0;
+    currentScanlineCycle = 21;
     currentDrawX = 0;
-	ppuOpenBus = 0x1F; // Not always on IRL hardware, but most of the time
+    ppuOpenBus = 0x1F; // Not always on IRL hardware, but most of the time
     registers.ctrl = 0;
     registers.mask = 0;
     if (hardReset)

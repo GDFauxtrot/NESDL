@@ -23,6 +23,7 @@
 #define ID_DBUG_STEPCPU	304
 #define ID_DBUG_STEPPPU	305
 #define ID_DBUG_NINTLOG	306
+#define ID_DBUG_REMVLOG	307
 
 
 void NESDL_WinMenu::Initialize(SDL_Window* window)
@@ -69,6 +70,7 @@ void NESDL_WinMenu::Initialize(SDL_Window* window)
     AppendMenu(debugMenu, MF_STRING, ID_DBUG_STEPCPU, L"Step (CPU)");
     AppendMenu(debugMenu, MF_STRING, ID_DBUG_STEPPPU, L"Step (PPU)");
     AppendMenu(debugMenu, MF_STRING, ID_DBUG_NINTLOG, L"Attach Nintendulator Log...");
+    AppendMenu(debugMenu, MF_STRING, ID_DBUG_REMVLOG, L"Detach Nintendulator Log");
 
     // attach menu bar to the window
     SetMenu(hwnd, mainMenu);
@@ -137,6 +139,9 @@ void NESDL_WinMenu::HandleWindowEvent(int eventId, NESDL_Core* core)
             break;
         case ID_DBUG_NINTLOG:
             core->Action_AttachNintendulatorLog();
+            break;
+        case ID_DBUG_REMVLOG:
+            core->Action_DetachNintendulatorLog();
             break;
     }
 }

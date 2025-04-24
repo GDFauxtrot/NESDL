@@ -324,6 +324,5 @@ void NESDL_Mapper_4::ClockIRQ()
     {
         //printf("\nIRQ Trigger");
         core->cpu->irq = true;
-        core->cpu->delayIRQ = true;
     }
 }
