@@ -118,7 +118,7 @@ void NESDL_CPU::Update(uint32_t ppuCycles)
 
             // Debug Nintendulator format
             //printf("\n%04X  %02X\t\t\t\t\t\tA:%02X X:%02X Y:%02X P:%02X SP:%02X PPU:%3d,%3d CYC:%llu", registers.pc, core->ram->ReadByte(registers.pc), registers.a, registers.x, registers.y, registers.p, registers.sp, core->ppu->currentScanline, core->ppu->currentScanlineCycle, elapsedCycles);
-            printf("\n%s", DebugMakeCurrentStateLine().c_str());
+            //printf("\n%s", DebugMakeCurrentStateLine().c_str());
 
             ppuCycleCounter -= nextInstructionPPUCycles;
             RunNextInstruction();
