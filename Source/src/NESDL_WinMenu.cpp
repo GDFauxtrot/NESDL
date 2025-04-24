@@ -24,13 +24,6 @@
 #define ID_DBUG_STEPPPU	305
 #define ID_DBUG_NINTLOG	306
 
-// 1) Add "Open Nintendulator log..." option
-// 2) Load file, parse via newlines
-// 3) Index to log initialized at 0 (first line)
-// 4) Every CPU instruction, read the line and compare to current info
-// 5) If false, printf or something
-// 6) Advance index after CPU instruction happens
-// 7) Reset index on ROM reset/load
 
 void NESDL_WinMenu::Initialize(SDL_Window* window)
 {
