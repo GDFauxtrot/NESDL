@@ -22,6 +22,7 @@
     <ClInclude Include="Source\include\mappers\NESDL_Mapper.h" />
     <ClInclude Include="Source\include\NESDL.h" />
     <ClInclude Include="Source\include\NESDL_APU.h" />
+    <ClInclude Include="Source\include\NESDL_Config.h" />
     <ClInclude Include="Source\include\NESDL_Constants.h" />
     <ClInclude Include="Source\include\NESDL_Core.h" />
     <ClInclude Include="Source\include\NESDL_CPU.h" />
@@ -32,6 +33,7 @@
     <ClInclude Include="Source\src\nfd\common.h" />
     <ClInclude Include="Source\src\nfd\nfd.h" />
     <ClInclude Include="Source\src\nfd\nfd_common.h" />
+    <ClInclude Include="Source\src\SCL\SCL.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\include\NESDL_WinMenu.h" />
@@ -41,6 +43,7 @@
     <ClCompile Include="Source\src\mappers\NESDL_Mapper_9.cpp" />
     <ClCompile Include="Source\src\NESDL.cpp" />
     <ClCompile Include="Source\src\NESDL_APU.cpp" />
+    <ClCompile Include="Source\src\NESDL_Config.cpp" />
     <ClCompile Include="Source\src\NESDL_Core.cpp" />
     <ClCompile Include="Source\src\NESDL_CPU.cpp" />
     <ClCompile Include="Source\src\NESDL_Input.cpp" />

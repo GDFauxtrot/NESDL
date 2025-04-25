@@ -31,6 +31,7 @@
 #include <random>
 
 #include "NESDL_Constants.h"
+#include "NESDL_Config.h"
 #include "NESDL_Input.h"
 
 #ifdef __APPLE__

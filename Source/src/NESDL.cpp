@@ -126,6 +126,7 @@ int main(int argc, char* args[])
 #endif
     }
 
+    core->Exit();
     sdlCtx->SDLQuit();
     return 0;
 }

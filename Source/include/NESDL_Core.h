@@ -28,6 +28,7 @@ class NESDL_Core
 {
 public:
     void Init(NESDL_SDL* sdl);
+    void Exit();
     void Update(double deltaTime);
     void LoadROM(const char* path);
     void HandleEvent(SDL_EventType eventType, SDL_KeyCode eventKeyCode);
@@ -59,11 +60,14 @@ public:
     NESDL_APU* apu;
     NESDL_Input* input;
     NESDL_Mapper* mapper;
+    NESDL_Config* config;
 
     bool romLoaded;
     bool paused;
 
 private:
+    string GetDirectoryOf(const string& filePath);
+
     NESDL_SDL* sdlCtx;
     
     double timeSinceStartup;

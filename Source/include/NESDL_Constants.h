@@ -12,6 +12,9 @@ const string NESDL_WINDOW_NAME = "NESDL";
 const string NESDL_VERSION_STR = "0.1.0";
 const string NESDL_VERSIONDATE = "April 16th, 2025";
 
+// Config file name
+#define NESDL_CONFIG "nesdl.cfg"
+
 // PPU
 #define PPU_WIDTH 256
 #define PPU_HEIGHT 240

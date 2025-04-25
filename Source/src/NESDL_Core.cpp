@@ -17,15 +17,27 @@ void NESDL_Core::Init(NESDL_SDL* sdl)
     ram = new NESDL_RAM();
     apu = new NESDL_APU();
     input = new NESDL_Input();
+    config = new NESDL_Config();
 
     cpu->Init(this);
     ppu->Init(this);
     ram->Init(this);
     apu->Init(this, sdlCtx);
     input->Init(this);
+    config->Init(this);
     
     // Connect player 1 controller from the start
     input->SetControllerConnected(true, false);
+}
+
+void NESDL_Core::Exit()
+{
+    delete cpu;
+    delete ppu;
+    delete ram;
+    delete apu;
+    delete input;
+    delete config;
 }
 
 void NESDL_Core::Update(double deltaTime)
@@ -210,7 +222,8 @@ void NESDL_Core::Action_ShowAbout()
 void NESDL_Core::Action_OpenROM()
 {
     nfdchar_t* romFilePath = NULL;
-    nfdresult_t result = NFD_OpenDialog("nes", NULL, &romFilePath);
+    string defFilePath = GetDirectoryOf(config->ReadString("NESDL_LastROM", ""));
+    nfdresult_t result = NFD_OpenDialog("nes", defFilePath.c_str(), &romFilePath);
     // Don't continue if we didn't successfully choose a file, or (somehow) it's empty
     if (result != NFD_OKAY || strcmp(romFilePath, "") == 0)
     {
@@ -223,6 +236,7 @@ void NESDL_Core::Action_OpenROM()
     LoadROM(romFilePath);
     if (romLoaded)
     {
+        config->WriteValue("NESDL_LastROM", string(romFilePath));
         Action_ResetHard();
     }
 }
@@ -306,7 +320,8 @@ void NESDL_Core::Action_DebugShowNT()
 void NESDL_Core::Action_AttachNintendulatorLog()
 {
     nfdchar_t* logFilePath = NULL;
-    nfdresult_t result = NFD_OpenDialog("debug", NULL, &logFilePath);
+    string defFilePath = GetDirectoryOf(config->ReadString("NESDL_LastLog", ""));
+    nfdresult_t result = NFD_OpenDialog("debug", defFilePath.c_str(), &logFilePath);
     // Don't continue if we didn't successfully choose a file, or (somehow) it's empty
     if (result != NFD_OKAY || strcmp(logFilePath, "") == 0)
     {
@@ -314,10 +329,18 @@ void NESDL_Core::Action_AttachNintendulatorLog()
     }
     else
     {
+        config->WriteValue("NESDL_LastLog", string(logFilePath));
         cpu->DebugBindNintendulator(logFilePath);
     }
 }
 void NESDL_Core::Action_DetachNintendulatorLog()
 {
     cpu->DebugUnbindNintendulator();
+}
+
+// https://stackoverflow.com/questions/8518743/get-directory-from-file-path-c
+string NESDL_Core::GetDirectoryOf(const string& filePath)
+{
+    size_t pos = filePath.find_last_of("\\/");
+    return (string::npos == pos) ? "" : filePath.substr(0, pos);
 }
