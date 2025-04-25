@@ -117,7 +117,6 @@ void NESDL_CPU::Update(uint32_t ppuCycles)
             }
 
             // Debug Nintendulator format
-            //printf("\n%04X  %02X\t\t\t\t\t\tA:%02X X:%02X Y:%02X P:%02X SP:%02X PPU:%3d,%3d CYC:%llu", registers.pc, core->ram->ReadByte(registers.pc), registers.a, registers.x, registers.y, registers.p, registers.sp, core->ppu->currentScanline, core->ppu->currentScanlineCycle, elapsedCycles);
             //printf("\n%s", DebugMakeCurrentStateLine().c_str());
 
             ppuCycleCounter -= nextInstructionPPUCycles;
@@ -1583,7 +1582,7 @@ string NESDL_CPU::DebugMakeCurrentStateLine()
         case AddrMode::ABSOLUTEADDR:
         {
             returnStr << string_format("%02X %02X %02X  ", opcode, param0, param1) << opcodeStr;
-            if (opcode == 0x20)
+            if (opcode == 0x20 || opcode == 0x4C || opcode == 0x6C)
             {
                 returnStr << string_format(" $%02X%02X                       ", param1, param0);
             }
