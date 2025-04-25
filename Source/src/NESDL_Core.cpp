@@ -236,7 +236,7 @@ void NESDL_Core::Action_OpenROM()
     LoadROM(romFilePath);
     if (romLoaded)
     {
-        config->WriteValue("NESDL_LastROM", string(romFilePath));
+        config->WriteValue(ConfigKey::LASTROM, string(romFilePath));
         Action_ResetHard();
     }
 }
@@ -329,7 +329,7 @@ void NESDL_Core::Action_AttachNintendulatorLog()
     }
     else
     {
-        config->WriteValue("NESDL_LastLog", string(logFilePath));
+        config->WriteValue(ConfigKey::LASTLOG, string(logFilePath));
         cpu->DebugBindNintendulator(logFilePath);
     }
 }

@@ -39,20 +39,33 @@ Currently, controls are hard-bound to the keyboard (mainly for me to use while d
 
 ## To-Do
 
-***Each action item is checkmarked to show progress*** (Updated 4/16/2025)
+***Each action item is checkmarked to show progress*** (Updated 4/25/2025)
 
 ### General/Misc
 
-- [x] Basic APU support (audio)
-  - Not fully working but mostly capable, some issues or inconsistencies may occur
-- [ ] Configuration file
-  * Store Player 1/2 controls
-  * Store audio level
+- MMC3 mapper support (iNES mapper 4)
+  - [x] IRQ/A12 clocking basics
+  - [ ] IRQ "details"
+  - [ ] IRQ scanline timing
+  - [ ] MMC3A accuracy
+  - [ ] MMC3B accuracy
+- Configuration file
+  - [x] Config reading/writing basics
+  - [ ] Config categories
+  - [ ] Store player controls (and read on NESDL startup)
+  - [ ] Store audio levels (and rest on NESDL startup)
+- Basic APU support (audio)
+  - [x] 4 basic audio channels
+  - [ ] PCM audio channel
+  - [ ] PCM IRQ
+- NES 2.0 header support
+  - [ ] Implement NES 2.0 parity with iNES support in NESDL
+- Options/Settings menu
+  - [ ] Decide on approach/build a basic window
+  - [ ] Add controls customization
+  - [ ] Add per-channel audio customization
 - [ ] Save/load state support
   * Could it be cross-emulator supported - FCEUX/Nintendulator/NESTopia loads our save state? Is there an agreed-upon standard here?
-- [ ] Rebindable keys menu
-  * May be more difficult since I'm not using QT/IMGUI which would've possibly made this a breeze. Hopefully SDL has something
-- [ ] NES 2.0 header support
 - [ ] Famicom emulation (& PAL support)
 - [ ] Ubuntu & Arch package builds?
 
