@@ -96,7 +96,7 @@ namespace scl {
 					if (this->mode == READ) {
 // NESDL: added lines to avoid exception
 						//touch file to create it if non-existent
-						this->file.open(filename);
+						this->file.open(filename, std::fstream::out | std::fstream::app);
 						this->file.close();
 // NESDL_END
 						//open the fstream
