@@ -34,11 +34,15 @@ public:
     template <typename T>
     void WriteValue(const string& section, const string& key, T value)
     {
+        BeginWrite(FILENAME);
+
         // Utilize stringstream to convert and store value
         // (idea borrowed from Simple Config Library)
         stringstream ss;
         ss << value;
         data[section][key] = ss.str();
+
+        WriteToFileAndClose();
     }
 
     template <typename T>
