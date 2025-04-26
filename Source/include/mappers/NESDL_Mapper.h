@@ -89,6 +89,7 @@ public:
     using NESDL_Mapper::NESDL_Mapper; // Inherit constructor(s)
     virtual void InitROMData(uint8_t* prgROMData, uint8_t prgROMBanks, uint8_t* chrROMData, uint8_t chrROMBanks);
     MirroringMode GetMirroringMode() { return mirroringMode; }
+    void SetFourWayMirroring(uint8_t fourWayMirroringMode);
     virtual uint8_t ReadByte(uint16_t addr);
     virtual void WriteByte(uint16_t addr, uint8_t data);
     void ClockIRQ();

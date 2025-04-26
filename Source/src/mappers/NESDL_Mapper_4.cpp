@@ -26,6 +26,16 @@ void NESDL_Mapper_4::InitROMData(uint8_t* prgROMData, uint8_t prgROMBanks, uint8
     }
 }
 
+void NESDL_Mapper_4::SetFourWayMirroring(uint8_t fourWayMirroringMode)
+{
+    mirroringModeHardwired = false;
+    if (fourWayMirroringMode)
+    {
+        mirroringMode = MirroringMode::Four;
+        mirroringModeHardwired = true;
+    }
+}
+
 uint8_t NESDL_Mapper_4::ReadByte(uint16_t addr)
 {
     if (chrA12Inversion == false)
@@ -263,7 +273,7 @@ void NESDL_Mapper_4::WriteByte(uint16_t addr, uint8_t data)
             // Can only change if mirroring isn't hard-wired already (aka 4-way mirroring)
             if (mirroringModeHardwired == false)
             {
-                mirroringMode = (MirroringMode) (data & 0x01);
+                mirroringMode = (data & 0x1) == 0 ? MirroringMode::Vertical : MirroringMode::Horizontal;
             }
         }
         // PRG-RAM protect logic on odd

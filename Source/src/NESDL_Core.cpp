@@ -139,6 +139,7 @@ void NESDL_Core::LoadROM(const char* path)
             break;
         case 4:
             mapper = new NESDL_Mapper_4(this);
+            ((NESDL_Mapper_4*)mapper)->SetFourWayMirroring(header.ctrl1 & INES_NTLAYOUT);
             break;
         case 9:
             mapper = new NESDL_Mapper_9(this);
