@@ -1,9 +1,5 @@
 #pragma once
 
-#ifdef _WIN32
-#include <unordered_map>
-#endif
-
 class NESDL_Text
 {
 public:

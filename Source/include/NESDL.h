@@ -29,6 +29,7 @@
 #include <chrono>
 #include <thread>
 #include <random>
+#include <unordered_map>
 
 #include "NESDL_Constants.h"
 #include "NESDL_Config.h"

@@ -51,7 +51,7 @@ Currently, controls are hard-bound to the keyboard (mainly for me to use while d
   - [ ] MMC3B accuracy
 - Configuration file
   - [x] Config reading/writing basics
-  - [ ] Config categories
+  - [x] Config categories
   - [ ] Store player controls (and read on NESDL startup)
   - [ ] Store audio levels (and rest on NESDL startup)
 - Basic APU support (audio)
@@ -121,5 +121,3 @@ As of writing this (4/14/2025), it has been some time since I have opened the pr
 This software is licensed under [GNU GPLv3](https://choosealicense.com/licenses/gpl-3.0/), and has been included in this repository (see LICENSE for a copy)
 
 This software uses the library [nativefiledialog](https://github.com/mlabbe/nativefiledialog). Its license [can be found here](https://github.com/mlabbe/nativefiledialog/blob/master/LICENSE). Some modification of the source code has been performed, including removing the removal of platform-specific files; any further modifications have been denoted in the source code itself.
-
-This software uses the library [Simple Config Library](https://github.com/WizardCarter/simple-config-library). Its license [can be found here](https://github.com/WizardCarter/simple-config-library/blob/master/LICENSE). Some modification of the source code has been performed; these modifications have been denoted in the source code itself.

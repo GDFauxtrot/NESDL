@@ -222,7 +222,7 @@ void NESDL_Core::Action_ShowAbout()
 void NESDL_Core::Action_OpenROM()
 {
     nfdchar_t* romFilePath = NULL;
-    string defFilePath = GetDirectoryOf(config->ReadString(ConfigKey::LASTROM, ""));
+    string defFilePath = GetDirectoryOf(config->ReadValue<string>(ConfigSection::GENERAL, ConfigKey::LASTROM, ""));
     nfdresult_t result = NFD_OpenDialog("nes", defFilePath.c_str(), &romFilePath);
     // Don't continue if we didn't successfully choose a file, or (somehow) it's empty
     if (result != NFD_OKAY || strcmp(romFilePath, "") == 0)
@@ -236,7 +236,7 @@ void NESDL_Core::Action_OpenROM()
     LoadROM(romFilePath);
     if (romLoaded)
     {
-        config->WriteValue(ConfigKey::LASTROM, string(romFilePath));
+        config->WriteValue(ConfigSection::GENERAL, ConfigKey::LASTROM, string(romFilePath));
         Action_ResetHard();
     }
 }
@@ -320,7 +320,7 @@ void NESDL_Core::Action_DebugShowNT()
 void NESDL_Core::Action_AttachNintendulatorLog()
 {
     nfdchar_t* logFilePath = NULL;
-    string defFilePath = GetDirectoryOf(config->ReadString(ConfigKey::LASTLOG, ""));
+    string defFilePath = GetDirectoryOf(config->ReadValue<string>(ConfigSection::GENERAL, ConfigKey::LASTLOG, ""));
     nfdresult_t result = NFD_OpenDialog("debug", defFilePath.c_str(), &logFilePath);
     // Don't continue if we didn't successfully choose a file, or (somehow) it's empty
     if (result != NFD_OKAY || strcmp(logFilePath, "") == 0)
@@ -329,7 +329,7 @@ void NESDL_Core::Action_AttachNintendulatorLog()
     }
     else
     {
-        config->WriteValue(ConfigKey::LASTLOG, string(logFilePath));
+        config->WriteValue(ConfigSection::GENERAL, ConfigKey::LASTLOG, string(logFilePath));
         cpu->DebugBindNintendulator(logFilePath);
     }
 }

@@ -3,66 +3,64 @@
 void NESDL_Config::Init(NESDL_Core* c)
 {
     core = c;
+
+    // On init, read values from our config file
+    ReadFileAndClose(FILENAME);
+
+    // On first launch/missing cfg/etc, populate config file with defaults
+    if (data.empty())
+    {
+        BeginWrite(FILENAME);
+        data = GetConfigDefaults();
+        WriteToFileAndClose();
+    }
 }
 
-template <typename T>
-void NESDL_Config::WriteValue(string section, string key, T value)
-{
 
+void NESDL_Config::WriteToFileAndClose()
+{
+    if (!file.is_open())
+    {
+        return;
+    }
+
+    for (pair<string, unordered_map<string, string>> sectionKV : data)
+    {
+        // Write section, then all entries in the section
+        file << "[" << sectionKV.first << "]\n";
+        for (pair<string, string> kv : sectionKV.second)
+        {
+            file << kv.first << "=" << kv.second << "\n";
+        }
+        file << "\n";
+    }
+    file.close();
 }
 
-template <typename T>
-T NESDL_Config::ReadValue(string section, string key, T defVal)
+unordered_map<string, unordered_map<string, string>> NESDL_Config::GetConfigDefaults()
 {
-	return defVal;
-}
-
-void NESDL_Config::WriteValue(string section, string key, bool value)
-{
-    //config_file cfg(FILENAME, config_file::WRITE);
-    //cfg.put<bool>(key, value);
-    //cfg.write_changes_unique();
-    //cfg.close();
-}
-
-void NESDL_Config::WriteValue(string section, string key, int value)
-{
-    //config_file cfg(FILENAME, config_file::WRITE);
-    //cfg.put<int>(key, value);
-    //cfg.write_changes_unique();
-    //cfg.close();
-}
-
-void NESDL_Config::WriteValue(string section, string key, string value)
-{
-    //config_file cfg(FILENAME, config_file::WRITE);
-    //cfg.put<string>(key, value);
-    //cfg.write_changes_unique();
-    //cfg.close();
-}
-
-bool NESDL_Config::ReadBool(string section, string key, bool defVal)
-{
-    //config_file cfg(FILENAME, config_file::READ);
-    //bool result = cfg.get(key, defVal);
-    //cfg.close();
-    //return result;
-}
-
-int NESDL_Config::ReadInt(string section, string key, int defVal)
-{
-    //config_file cfg(FILENAME, config_file::READ);
-    //int result = cfg.get(key, defVal);
-    //cfg.close();
-    //return result;
-}
-
-string NESDL_Config::ReadString(string section, string key, string defVal)
-{
-    //config_file cfg(FILENAME, config_file::READ);
-    //string result = cfg.get(key, defVal);
-    //cfg.close();
-    //return result;
+    return
+    {
+        { ConfigSection::GENERAL,
+            {
+                { ConfigKey::LASTROM, "" },
+                { ConfigKey::LASTLOG, "" }
+            }
+        },
+        {
+            ConfigSection::PLAYER1,
+            {
+                { ConfigKey::INPUT_UP, SDL_GetKeyName(SDLK_w) },
+                { ConfigKey::INPUT_DOWN, SDL_GetKeyName(SDLK_s) },
+                { ConfigKey::INPUT_LEFT, SDL_GetKeyName(SDLK_a) },
+                { ConfigKey::INPUT_RIGHT, SDL_GetKeyName(SDLK_d) },
+                { ConfigKey::INPUT_A, SDL_GetKeyName(SDLK_m) },
+                { ConfigKey::INPUT_B, SDL_GetKeyName(SDLK_n) },
+                { ConfigKey::INPUT_SELECT, SDL_GetKeyName(SDLK_COMMA) },
+                { ConfigKey::INPUT_START, SDL_GetKeyName(SDLK_PERIOD) }
+            }
+        }
+    };
 }
 
 void NESDL_Config::BeginWrite(string filename)
@@ -72,66 +70,56 @@ void NESDL_Config::BeginWrite(string filename)
     ReadFromFile();
     file.close();
 
-    // Open file again in fstream::out, to be ready for writes
     file.open(filename, std::fstream::out);
-
-    // Log an error if we couldn't open the file for whatever reason
     if (!file.is_open())
     {
-        //if it isn't, throw an exception
         printf("CONFIG FILE NOT OPEN - something bad happened.\n");
     }
 }
 
 void NESDL_Config::ReadFileAndClose(string filename)
 {
-    //touch file to create it if non-existent
+    // Touch file to create it if non-existent
     file.open(filename, std::fstream::out | std::fstream::app);
     file.close();
-    
-    // Open file again in read mode
-    file.open(filename, std::fstream::in);
 
-    // Log an error if we couldn't open the file for whatever reason
+    file.open(filename, std::fstream::in);
     if (!file.is_open())
     {
         printf("CONFIG FILE NOT OPEN - something bad happened.\n");
     }
     else
     {
-        // Read the values from the file
         ReadFromFile();
-        // Close file once we're done (no need to keep it open)
-        file.close();
+        file.close(); // Close file once we're done (no need to keep it open)
     }
 }
 
 void NESDL_Config::ReadFromFile()
 {
-    // Do nothing if we have no file currently open
     if (!file.is_open())
     {
         return;
     }
-
-    // Clear currently-held data values before loading new values
     data.clear();
 
-    // Go through the currently-loaded file and load each line
     string currentSection = "";
     string currentLine;
     while (getline(file, currentLine))
     {
         currentLine = TrimWhitespace(currentLine);
+
         // Ignore line if it starts with a comment or is empty
         if (currentLine.empty() || currentLine[0] == '#')
         {
             continue;
         }
+        // Section
         if (currentLine[0] == '[')
         {
             currentSection = ParseSectionName(currentLine);
         }
+        // Normal entry
         else
         {
             pair<string, string> keyVal = GetKeyValuePair(currentLine);
@@ -140,19 +128,37 @@ void NESDL_Config::ReadFromFile()
     }
 }
 
-void NESDL_Config::WriteToFileAndClose()
+string NESDL_Config::ParseSectionName(string in)
 {
-    if (!file.is_open())
+    size_t lBraceIndex = in.find_first_of('[');
+    size_t rBraceIndex = in.find_first_of(']');
+
+    // Continue only if both braces present and right brace is after left brace
+    if (lBraceIndex < 0 || rBraceIndex < 0 || rBraceIndex < lBraceIndex)
     {
-        return;
+        return in;
     }
-    for (pair<string, unordered_map<string, string>> sectionKV : data)
+    return in.substr(lBraceIndex + 1, rBraceIndex - lBraceIndex - 1);
+}
+
+pair<string, string> NESDL_Config::GetKeyValuePair(string in, string delim)
+{
+    size_t i = in.find_first_of(delim);
+    if (i > 0)
     {
-        file << "[" << sectionKV.first << "]\n";
-        for (pair<string, string> kv : sectionKV.second)
-        {
-            file << kv.first << "=" << kv.second << "\n";
-        }
+        return pair<string, string>(in.substr(0, i), in.substr(i + 1, in.length() - i));
     }
-    file.close();
+    else
+    {
+        return pair<string, string>(in, "");
+    }
+}
+
+// https://stackoverflow.com/a/25385766
+string& NESDL_Config::TrimWhitespace(string& in)
+{
+    static const char* whitespace = " \t\n\r\f\v";
+    in.erase(in.find_last_not_of(whitespace) + 1); // Trim right
+    in.erase(0, in.find_first_not_of(whitespace)); // Trim left
+    return in;
 }

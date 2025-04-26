@@ -1,6 +1,13 @@
 #pragma once
 
 // String consts relevant to our config file
+class ConfigSection
+{
+public:
+    constexpr static const char* GENERAL		= "General";
+    constexpr static const char* PLAYER1		= "Player1";
+};
+
 class ConfigKey
 {
 public:
@@ -20,68 +27,68 @@ public:
 class NESDL_Config
 {
 public:
-    constexpr static const char* FILENAME = "nesdl.cfg";
+    constexpr static const char* FILENAME		= "nesdl.cfg";
 
     void Init(NESDL_Core* c);
 
     template <typename T>
-    void WriteValue(string section, string key, T value);
-
-    template <typename T>
-    T ReadValue(string section, string key, T defVal);
-
-    void WriteValue(string section, string key, bool value);
-    void WriteValue(string section, string key, int value);
-    void WriteValue(string section, string key, string value);
-    bool ReadBool(string section, string key, bool defVal = false);
-    int ReadInt(string section, string key, int defVal = 0);
-    string ReadString(string section, string key, string defVal = "");
-private:
-    NESDL_Core* core;
-
-    // Currently-loaded configuration data, organized into sections
-    // (all data must live in a section!)
-    unordered_map<string, unordered_map<string, string>> data;
-
-    // Handle to the currently loaded config file
-    fstream file;
-
-    void BeginWrite(string filename);
-    void ReadFileAndClose(string filename);
-    void ReadFromFile();
-    void WriteToFileAndClose();
-
-    string ParseSectionName(string in)
+    void WriteValue(const string& section, const string& key, T value)
     {
-        size_t lBraceIndex = in.find_first_of('[');
-        size_t rBraceIndex = in.find_first_of(']');
-        // Continue only if both braces present and right brace is after left brace
-        if (lBraceIndex < 0 || rBraceIndex < 0 || rBraceIndex < lBraceIndex)
-        {
-            return in;
-        }
-        return in.substr(lBraceIndex + 1, rBraceIndex - lBraceIndex - 1);
+        // Utilize stringstream to convert and store value
+        // (idea borrowed from Simple Config Library)
+        stringstream ss;
+        ss << value;
+        data[section][key] = ss.str();
     }
 
-    pair<string, string> GetKeyValuePair(string in, string delim = "=")
+    template <typename T>
+    T ReadValue(const string& section, const string& key, T defVal)
     {
-        size_t i = in.find_first_of(delim);
-        if (i > 0)
+        bool hasSection = data.find(section) != data.end();
+        bool hasKey = false;
+        if (hasSection)
         {
-            return pair<string, string>(in.substr(0, i), in.substr(i, in.length() - i - 1));
+            hasKey = data[section].find(key) == data[section].end();
+        }
+        if (hasSection && hasKey)
+        {
+            // Utilize stringstream to convert stored string back into value
+            // (idea borrowed from Simple Config Library)
+            stringstream ss(data[section][key]);
+
+            T out;
+            ss >> out;
+
+            if (ss.fail())
+            {
+                return defVal;
+            }
+            else
+            {
+                return out;
+            }
         }
         else
         {
-            return pair<string, string>(in, "");
+            // Data not found - return default value instead
+            return defVal;
         }
     }
+    void WriteToFileAndClose();
+    static unordered_map<string, unordered_map<string, string>> GetConfigDefaults();
 
-	// https://stackoverflow.com/a/25385766
-    string& TrimWhitespace(string& in)
-    {
-        static const char* whitespace = " \t\n\r\f\v";
-        in.erase(in.find_last_not_of(whitespace) + 1);
-        in.erase(0, in.find_last_not_of(whitespace));
-        return in;
-    }
+private:
+    NESDL_Core* core;
+    unordered_map<string, unordered_map<string, string>> data;
+    fstream file;
+
+    // Internal I/O and parsing functions
+    void BeginWrite(string filename);
+    void ReadFileAndClose(string filename);
+    void ReadFromFile();
+
+    // Helper functions
+    string ParseSectionName(string in);
+    pair<string, string> GetKeyValuePair(string in, string delim = "=");
+    string& TrimWhitespace(string& in);
 };
