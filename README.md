@@ -45,10 +45,10 @@ Currently, controls are hard-bound to the keyboard (mainly for me to use while d
 
 - MMC3 mapper support (iNES mapper 4)
   - [x] IRQ/A12 clocking basics
-  - [ ] IRQ "details"
+  - [x] IRQ "details"
   - [ ] IRQ scanline timing
-  - [ ] MMC3A accuracy
-  - [ ] MMC3B accuracy
+  - [x] MMC3 "normal" accuracy
+  - [ ] MMC3 "alternate" accuracy
 - Configuration file
   - [x] Config reading/writing basics
   - [x] Config categories

@@ -320,7 +320,7 @@ void NESDL_Mapper_4::WriteByte(uint16_t addr, uint8_t data)
 
 void NESDL_Mapper_4::ClockIRQ()
 {
-    //printf("%d/%d|%d", irqCounter, irqCounterReload, irqEnabled);
+    //printf("%d/%d|%d\n", irqCounter, irqCounterReload, irqEnabled);
     if (irqCounter == 0)
     {
         irqCounter = irqCounterReload;
@@ -332,7 +332,8 @@ void NESDL_Mapper_4::ClockIRQ()
 
     if (irqCounter == 0 && irqEnabled)
     {
-        //printf("\nIRQ Trigger");
+        //printf("IRQ Trigger\n");
         core->cpu->irq = true;
+        core->ppu->irqFiredAt = core->ppu->elapsedCycles;
     }
 }

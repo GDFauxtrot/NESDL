@@ -105,6 +105,7 @@ void NESDL_RAM::WriteByte(uint16_t addr, uint8_t data)
         else
         {
             // APU frame counter shenanigans
+            core->apu->WriteByte(addr, data);
         }
     }
     // APU test functionality + some unfinished hardware functionality (do nothing)

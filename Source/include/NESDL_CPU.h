@@ -230,7 +230,8 @@ public:
     bool delayNMI;
     bool dma;
     bool irq;
-    bool delayIRQ;
+    bool iFlagReady;
+    uint8_t iFlagNextSetState;
     bool nextInstructionReady;
 
     bool ignoreChanges;
@@ -304,12 +305,14 @@ private:
     void IRQ(); // IRQ interrupt
 
     string DebugMakeCurrentStateLine();
+    void EvaluateNintendulatorDebug();
 
     bool delayedDMA;
     NESDL_Core* core;
     AddressModeResult* addrModeResult;
     int16_t ppuCycleCounter;
     uint8_t nextInstructionPPUCycles;
+    bool irqFired;
     
     bool didMapperWrite;
     bool wasLastInstructionAMapperWrite; // Not happy with this, but needed

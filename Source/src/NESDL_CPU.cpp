@@ -33,7 +33,6 @@ void NESDL_CPU::Reset(bool hardReset)
     nmi = false;
     delayNMI = false;
     irq = false;
-    delayIRQ = false;
 
     // With the CPU state reset, prime the CPU for program execution
     // CPU warms up for 7 cycles and fetches the start address to PC
@@ -57,7 +56,6 @@ void NESDL_CPU::Update(uint32_t ppuCycles)
         {
             nmi = false;
             irq = false;
-            delayIRQ = false;
             NMI();
         }
         else if (delayedDMA)
@@ -67,7 +65,6 @@ void NESDL_CPU::Update(uint32_t ppuCycles)
         }
         else
         {
-            bool irqReadyToFire = irq && !delayIRQ && (registers.p & PSTATUS_INTERRUPTDISABLE) == 0;
             uint64_t prevElapsedCycles = elapsedCycles;
 
             if (dma)
@@ -76,7 +73,7 @@ void NESDL_CPU::Update(uint32_t ppuCycles)
                 delayedDMA = true;
             }
             delayNMI = false;
-            delayIRQ = false;
+            
             
             // Hack - we can predict a VBL occuring during this instruction, just... flip it on,
             // for timing accuracy purposes pls
@@ -90,46 +87,52 @@ void NESDL_CPU::Update(uint32_t ppuCycles)
                 }
             }
             
-            if (nintendulatorDebugging)
-            {
-				string ourCurrentLine = DebugMakeCurrentStateLine();
-				//printf("\n%s", ourCurrentLine.c_str());
-                if (nintendulatorLogIndex < nintendulatorLogCount)
-                {
-                    // Construct and store CPU state before running next instruction
-
-                    // Compare state to Nintendulator line - if it's off, we can print
-                    // a line comparison and try to debug
-                    string nintendulatorLine = nintendulatorLog[nintendulatorLogIndex];
-
-                    // The "quickest" way I could think of validating against Nintendulator is
-                    // comparing string-to-string outright
-                    if (ourCurrentLine != nintendulatorLine)
-                    {
-                        printf("\nLines differ!\n  Ours:%s\nTheirs:%s\n", ourCurrentLine.c_str(), nintendulatorLine.c_str());
-                    }
-                    nintendulatorLogIndex++;
-                }
-                else if (nintendulatorLogIndex == nintendulatorLogCount)
-                {
-                    printf("Nintendulator out of lines!\n");
-                }
-            }
+            EvaluateNintendulatorDebug();
 
             // Debug Nintendulator format
             //printf("\n%s", DebugMakeCurrentStateLine().c_str());
 
-            ppuCycleCounter -= nextInstructionPPUCycles;
-            RunNextInstruction();
-
-            if (irqReadyToFire)
+            // HACK for IRQ timing - PPU IRQ goes low JUST before CPU opcode fetch happens, this simulates that
+            bool wasIRQFiredExactly = core->ppu->elapsedCycles - 3 == core->ppu->irqFiredAt;
+            if (irq && wasIRQFiredExactly && (registers.p & PSTATUS_INTERRUPTDISABLE) == 0)
             {
                 irq = false;
-                delayIRQ = false;
-                elapsedCycles = prevElapsedCycles;
+                irqFired = true;
+            }
+
+            uint8_t ppuCyclesElapsed = nextInstructionPPUCycles;
+            if (irqFired)
+            {
+                irqFired = false;
                 IRQ();
+                ppuCycleCounter = -21; // 7 cycles * 3
             }
             else
+            {
+                ppuCycleCounter -= nextInstructionPPUCycles;
+                RunNextInstruction();
+            }
+
+            if (irq)
+            {
+                bool wasIRQFiredInTime = core->ppu->elapsedCycles + ppuCyclesElapsed - 3 >= core->ppu->irqFiredAt;
+                bool irqReadyToFire = wasIRQFiredInTime && (registers.p & PSTATUS_INTERRUPTDISABLE) == 0;
+
+                if (irqReadyToFire)
+                {
+                    irq = false;
+                    irqFired = true;
+                    //elapsedCycles = prevElapsedCycles;
+                }
+            }
+
+            if (iFlagReady)
+            {
+                iFlagReady = false;
+                registers.p = iFlagNextSetState;
+            }
+
+            //else
             {
                 // Figure out how long our new next instruction will take
                 nextInstructionPPUCycles = GetCyclesForNextInstruction() * 3;
@@ -834,11 +837,12 @@ void NESDL_CPU::OP_CLI(uint8_t opcode)
 {
     AddrMode mode = CPU_ADDRMODES[opcode];
 
-    SetPSFlag(PSTATUS_INTERRUPTDISABLE, false);
+    //SetPSFlag(PSTATUS_INTERRUPTDISABLE, false);
     AdvanceCyclesForAddressMode(opcode, mode, false, false, false);
     if (ignoreChanges == false)
     {
-        delayIRQ = true;
+        iFlagReady = true;
+        iFlagNextSetState = registers.p & (~PSTATUS_INTERRUPTDISABLE);
     }
 }
 
@@ -1152,12 +1156,13 @@ void NESDL_CPU::OP_PLP(uint8_t opcode)
     AddrMode mode = CPU_ADDRMODES[opcode];
 
     uint8_t stackVal = core->ram->ReadByte(STACK_PTR + (++registers.sp));
-    registers.p = stackVal;
+    //registers.p = stackVal & 0xEF; // "B flag and extra bit are ignored" - NESDEV (but Nintendulator only ignores B)
     
     AdvanceCyclesForAddressMode(opcode, mode, false, false, false);
     if (ignoreChanges == false)
     {
-        delayIRQ = true;
+        iFlagReady = true;
+        iFlagNextSetState = stackVal & 0xEF; // "B flag and extra bit are ignored" - NESDEV (but Nintendulator only ignores B)
     }
 }
 
@@ -1278,11 +1283,12 @@ void NESDL_CPU::OP_SEI(uint8_t opcode)
 {
     AddrMode mode = CPU_ADDRMODES[opcode];
 
-    SetPSFlag(PSTATUS_INTERRUPTDISABLE, true);
+    //SetPSFlag(PSTATUS_INTERRUPTDISABLE, true);
     AdvanceCyclesForAddressMode(opcode, mode, false, false, false);
     if (ignoreChanges == false)
     {
-        delayIRQ = true;
+        iFlagReady = true;
+        iFlagNextSetState = registers.p | PSTATUS_INTERRUPTDISABLE;
     }
 }
 
@@ -1440,7 +1446,7 @@ void NESDL_CPU::IRQ()
 
     // Advance 7 cycles
     elapsedCycles += 7;
-    ppuCycleCounter -= 21;
+    //ppuCycleCounter -= 21;
 }
 
 void NESDL_CPU::HaltCPUForDMAWrite()
@@ -1545,7 +1551,15 @@ string NESDL_CPU::DebugMakeCurrentStateLine()
         case AddrMode::IMPLICIT:
         {
             returnStr << string_format("%02X        ", opcode) << opcodeStr;
-            returnStr << "                             ";
+            if (opcode == 0x4A)
+            {
+                // Treat LSR no-arg mode (Accumulator) as unique case, print "LSR A"
+                returnStr << " A                           ";
+            }
+            else
+            {
+                returnStr << "                             ";
+            }
             break;
         }
         case AddrMode::RELATIVEADDR:
@@ -1623,4 +1637,35 @@ string NESDL_CPU::DebugMakeCurrentStateLine()
     ignoreChanges = false;
 
     return returnStr.str();
+}
+
+void NESDL_CPU::EvaluateNintendulatorDebug()
+{
+    if (!nintendulatorDebugging)
+    {
+        return;
+    }
+
+    string ourCurrentLine = DebugMakeCurrentStateLine();
+    //printf("\n%s", ourCurrentLine.c_str());
+    if (nintendulatorLogIndex < nintendulatorLogCount)
+    {
+        // Construct and store CPU state before running next instruction
+
+        // Compare state to Nintendulator line - if it's off, we can print
+        // a line comparison and try to debug
+        string nintendulatorLine = nintendulatorLog[nintendulatorLogIndex];
+
+        // The "quickest" way I could think of validating against Nintendulator is
+        // comparing string-to-string outright
+        if (ourCurrentLine != nintendulatorLine)
+        {
+            printf("\nLines differ!\n  Ours:%s\nTheirs:%s\n", ourCurrentLine.c_str(), nintendulatorLine.c_str());
+        }
+        nintendulatorLogIndex++;
+    }
+    else if (nintendulatorLogIndex == nintendulatorLogCount)
+    {
+        printf("Nintendulator out of lines!\n");
+    }
 }

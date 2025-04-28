@@ -39,6 +39,8 @@ void NESDL_PPU::Reset(bool hardReset)
     secondaryOAMNextSlot = 0;
     disregardVBL = false;
     disregardNMI = false;
+
+    irqFiredAt = 0;
 }
 
 void NESDL_PPU::Update(uint32_t ppuCycles)
@@ -97,8 +99,8 @@ void NESDL_PPU::RunNextCycle()
         currentFrame++;
     }
 
-    // MMC3 only: clock IRQ at certain times
-    if (mapper->mapperNumber == 4)
+    // MMC3 only: clock IRQ at certain times during visible rendering
+    if ((currentScanline < 240 || currentScanline > 260) && mapper->mapperNumber == 4)
     {
         // 8x16 mode
         if (registers.ctrl & PPUCTRL_SPRHEIGHT)
@@ -202,7 +204,6 @@ void NESDL_PPU::HandleProcessVisibleScanline()
                 for (int i = start; i < end; ++i)
                 {
                     uint16_t currentPixel = (currentScanline * PPU_WIDTH) + currentDrawX;
-                    
                     // Don't render if we wrote a sprite pixel here, unless the BG tile has priority
                     uint8_t patternBits = GetPatternBits(toRender.pattern, i);
                     bool bgPriority = (frameDataSprite[currentPixel] & 0x80) != 0x00;
@@ -212,6 +213,10 @@ void NESDL_PPU::HandleProcessVisibleScanline()
                     {
                         uint32_t palette = GetPalette(toRender.paletteIndex, false);
                         uint32_t color = GetColor(toRender.pattern, palette, i);
+                        if (currentDrawX < 8 && !(registers.mask & PPUMASK_BG_LCOL_ENABLE))
+                        {
+                            color = GetColor(0, palette, 0);
+                        }
                         // Tile debugging lines
 //                        if (currentScanline % 8 == 0 || currentDrawX % 8 == 0)
 //                        {
@@ -251,7 +256,7 @@ void NESDL_PPU::HandleProcessVisibleScanline()
                     while (currentDrawX < 256)
                     {
                         uint16_t currentPixel = (currentScanline * PPU_WIDTH) + currentDrawX;
-                        
+
                         // Don't render if we wrote a sprite pixel here, unless the BG tile has priority
                         uint8_t patternBits = GetPatternBits(toRender.pattern, i);
                         bool bgPriority = (frameDataSprite[currentPixel] & 0x80) != 0x00;
@@ -261,6 +266,10 @@ void NESDL_PPU::HandleProcessVisibleScanline()
                         {
                             uint32_t palette = GetPalette(toRender.paletteIndex, false);
                             uint32_t color = GetColor(toRender.pattern, palette, i);
+                            if (currentDrawX < 8 && !(registers.mask & PPUMASK_BG_LCOL_ENABLE))
+                            {
+                                color = GetColor(0, palette, 0);
+                            }
                             frameData[currentPixel] = color;
                             if (patternBits != 0x00)
                             {
@@ -383,6 +392,11 @@ void NESDL_PPU::HandleProcessVisibleScanline()
                     if (sprData.oamIndex == 0 && !(leftSide || lastRow || spr0HitAlready))
                     {
                         registers.status |= PPUSTATUS_SPR0HIT;
+                    }
+
+                    if (currentScanlineCycle < 8 && !(registers.mask & PPUMASK_SPR_LCOL_ENABLE))
+                    {
+                        continue;
                     }
                     
                     // We only keep going if this sprite has a lower OAM index than any written before it here

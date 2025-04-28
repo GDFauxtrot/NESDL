@@ -120,11 +120,12 @@ public:
     uint16_t currentScanlineCycle;
     bool frameDataReady;
     bool frameFinished;
+    uint64_t irqFiredAt;
+    uint64_t elapsedCycles;
 private:
     NESDL_Core* core;
     NESDL_Mapper* mapper;
 
-    uint64_t elapsedCycles;
     int32_t currentDrawX;
     uint8_t vram[0x1000];  // 4kb VRAM for the PPU (physically 2kb but supports 4 nametables)
     uint8_t paletteData[0x20]; // Bit of space at the end of VRAM address space for palette data

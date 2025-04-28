@@ -52,7 +52,7 @@ public:
         bool hasKey = false;
         if (hasSection)
         {
-            hasKey = data[section].find(key) == data[section].end();
+            hasKey = data[section].find(key) != data[section].end();
         }
         if (hasSection && hasKey)
         {
