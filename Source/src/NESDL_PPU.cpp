@@ -789,6 +789,10 @@ void NESDL_PPU::UpdateNTFrameData()
 
 void NESDL_PPU::WriteToRegister(uint16_t registerAddr, uint8_t data)
 {
+    // Writes to any register load the open bus
+    // https://www.nesdev.org/wiki/Open_bus_behavior#PPU_open_bus
+    ppuOpenBus = data;
+
     // Do not allow writes when the PPU is still warming up
     if ((!IsPPUReady() && (registerAddr == PPU_PPUCTRL ||
                          registerAddr == PPU_PPUMASK ||
@@ -797,10 +801,6 @@ void NESDL_PPU::WriteToRegister(uint16_t registerAddr, uint8_t data)
     {
         return;
     }
-
-    // Writes to any register load the open bus
-    // https://www.nesdev.org/wiki/Open_bus_behavior#PPU_open_bus
-    ppuOpenBus = data;
 
     switch (registerAddr)
     {

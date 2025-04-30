@@ -56,7 +56,9 @@ void NESDL_CPU::Update(uint32_t ppuCycles)
         {
             nmi = false;
             irq = false;
+			EvaluateNintendulatorDebug();
             NMI();
+			nextInstructionPPUCycles = GetCyclesForNextInstruction() * 3;
         }
         else if (delayedDMA)
         {
@@ -1193,7 +1195,7 @@ void NESDL_CPU::OP_ROL(uint8_t opcode)
     AdvanceCyclesForAddressMode(opcode, mode, false, true, false);
     
     SetPSFlag(PSTATUS_CARRY, (oldValue & 0x80) >> 6); // Set to old value bit 7
-    SetPSFlag(PSTATUS_ZERO, registers.a == 0);
+    SetPSFlag(PSTATUS_ZERO, value == 0);
     SetPSFlag(PSTATUS_NEGATIVE, (value & 0x80) >> 6); // Set to new value bit 7
 }
 
@@ -1224,7 +1226,7 @@ void NESDL_CPU::OP_ROR(uint8_t opcode)
     AdvanceCyclesForAddressMode(opcode, mode, false, true, false);
     
     SetPSFlag(PSTATUS_CARRY, (oldValue & 0x01)); // Set to old value bit 0
-    SetPSFlag(PSTATUS_ZERO, registers.a == 0);
+    SetPSFlag(PSTATUS_ZERO, value == 0);
     SetPSFlag(PSTATUS_NEGATIVE, (value & 0x80) >> 6); // Set to new value bit 7
 }
 
@@ -1551,7 +1553,7 @@ string NESDL_CPU::DebugMakeCurrentStateLine()
         case AddrMode::IMPLICIT:
         {
             returnStr << string_format("%02X        ", opcode) << opcodeStr;
-            if (opcode == 0x4A)
+            if (opcode == 0x4A || opcode == 0x0A)
             {
                 // Treat LSR no-arg mode (Accumulator) as unique case, print "LSR A"
                 returnStr << " A                           ";
