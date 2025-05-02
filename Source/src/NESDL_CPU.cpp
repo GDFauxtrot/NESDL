@@ -51,16 +51,19 @@ void NESDL_CPU::Update(uint32_t ppuCycles)
 {
     while (ppuCycleCounter >= 0)
     {
+        /*
         // Handle NMI/IRQ/DMA
-        if (nmi && !delayNMI)
+        //if (nmi && !delayNMI)
+        if (nmi)
         {
             nmi = false;
             irq = false;
-			EvaluateNintendulatorDebug();
+            EvaluateNintendulatorDebug();
             NMI();
-			nextInstructionPPUCycles = GetCyclesForNextInstruction() * 3;
+            nextInstructionPPUCycles = GetCyclesForNextInstruction() * 3;
         }
-        else if (delayedDMA)
+        */
+        if (delayedDMA)
         {
             delayedDMA = false;
             HaltCPUForDMAWrite();
@@ -68,14 +71,11 @@ void NESDL_CPU::Update(uint32_t ppuCycles)
         else
         {
             uint64_t prevElapsedCycles = elapsedCycles;
-
             if (dma)
             {
                 dma = false;
                 delayedDMA = true;
             }
-            delayNMI = false;
-            
             
             // Hack - we can predict a VBL occuring during this instruction, just... flip it on,
             // for timing accuracy purposes pls
@@ -92,7 +92,16 @@ void NESDL_CPU::Update(uint32_t ppuCycles)
             EvaluateNintendulatorDebug();
 
             // Debug Nintendulator format
-            //printf("\n%s", DebugMakeCurrentStateLine().c_str());
+            // printf("\n%s", DebugMakeCurrentStateLine().c_str());
+
+            bool wasIRQFiredInTime = core->ppu->elapsedCycles - 2 >= core->ppu->nmiFiredAt;
+            if (nmi && !delayNMI && wasIRQFiredInTime)
+            {
+                irq = false;
+                nmi = false;
+                nmiFired = true;
+            }
+            delayNMI = false;
 
             // HACK for IRQ timing - PPU IRQ goes low JUST before CPU opcode fetch happens, this simulates that
             bool wasIRQFiredExactly = core->ppu->elapsedCycles - 3 == core->ppu->irqFiredAt;
@@ -103,7 +112,13 @@ void NESDL_CPU::Update(uint32_t ppuCycles)
             }
 
             uint8_t ppuCyclesElapsed = nextInstructionPPUCycles;
-            if (irqFired)
+            if (nmiFired)
+            {
+                nmiFired = false;
+                NMI();
+                ppuCycleCounter = -21; // 7 cycles * 3
+            }
+            else if (irqFired)
             {
                 irqFired = false;
                 IRQ();
@@ -1016,7 +1031,7 @@ void NESDL_CPU::OP_JMP(uint8_t opcode, bool indirect)
     // But for accuracy I'd like to match this?
     if (core->ppu->currentScanlineCycle == 334)
     {
-        delayNMI = true;
+        //delayNMI = true;
     }
 }
 
@@ -1553,9 +1568,9 @@ string NESDL_CPU::DebugMakeCurrentStateLine()
         case AddrMode::IMPLICIT:
         {
             returnStr << string_format("%02X        ", opcode) << opcodeStr;
-            if (opcode == 0x4A || opcode == 0x0A)
+            if (opcode == 0x0A || opcode == 0x2A || opcode == 0x4A || opcode == 0x6A)
             {
-                // Treat LSR no-arg mode (Accumulator) as unique case, print "LSR A"
+                // Treat these no-arg mode (Accumulator) as unique cases, eg. "LSR A"
                 returnStr << " A                           ";
             }
             else

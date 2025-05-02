@@ -121,6 +121,7 @@ public:
     bool frameDataReady;
     bool frameFinished;
     uint64_t irqFiredAt;
+    uint64_t nmiFiredAt;
     uint64_t elapsedCycles;
 private:
     NESDL_Core* core;

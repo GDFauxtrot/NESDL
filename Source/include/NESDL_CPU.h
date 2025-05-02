@@ -313,6 +313,7 @@ private:
     int16_t ppuCycleCounter;
     uint8_t nextInstructionPPUCycles;
     bool irqFired;
+    bool nmiFired;
     
     bool didMapperWrite;
     bool wasLastInstructionAMapperWrite; // Not happy with this, but needed
