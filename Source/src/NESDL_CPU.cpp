@@ -68,12 +68,16 @@ void NESDL_CPU::Update(uint32_t ppuCycles)
             // Hack - we can predict a VBL occuring during this instruction, since CPU runs instructions as a whole
             // but PPU timing for VBL/NMI is more granular than this
             // GetCyclesForNextInstruction prepped our addrModeResult address, we just need to check it
-            if (addrModeResult->address >= 0x2000)
+            if (addrModeResult->address >= 0x2000 && addrModeResult->address < 0x4000)
             {
                 uint16_t addr = 0x2000 + (addrModeResult->address % 0x8);
                 if (addr == PPU_PPUSTATUS)
                 {
                     core->ppu->PreprocessPPUForReadInstructionTiming(nextInstructionPPUCycles);
+                }
+                if (addr == PPU_PPUCTRL)
+                {
+                    core->ppu->PreprocessPPUForWriteInstructionTiming(nextInstructionPPUCycles, addrModeResult->value);
                 }
             }
             
@@ -82,7 +86,7 @@ void NESDL_CPU::Update(uint32_t ppuCycles)
             // Debug Nintendulator format
             // printf("\n%s", DebugMakeCurrentStateLine().c_str());
 
-            bool wasNMIFiredInTime = core->ppu->elapsedCycles - 3 >= core->ppu->nmiFiredAt;
+            bool wasNMIFiredInTime = core->ppu->elapsedCycles - 2 >= core->ppu->nmiFiredAt;
             if (nmi && !delayNMI && wasNMIFiredInTime)
             {
                 irq = false;
@@ -1290,6 +1294,7 @@ void NESDL_CPU::OP_STA(uint8_t opcode)
     core->ppu->incrementV = false;
     core->ppu->isWriting = true;
     GetByteForAddressMode(mode, addrModeResult);
+    addrModeResult->value = registers.a;
     core->ppu->incrementV = true;
     core->ppu->isWriting = false;
     AdvanceCyclesForAddressMode(opcode, mode, true, false, false);
@@ -1304,6 +1309,7 @@ void NESDL_CPU::OP_STX(uint8_t opcode)
     core->ppu->incrementV = false;
     core->ppu->isWriting = true;
     GetByteForAddressMode(mode, addrModeResult);
+    addrModeResult->value = registers.x;
     core->ppu->incrementV = true;
     core->ppu->isWriting = false;
     AdvanceCyclesForAddressMode(opcode, mode, false, false, false);
@@ -1318,6 +1324,7 @@ void NESDL_CPU::OP_STY(uint8_t opcode)
     core->ppu->incrementV = false;
     core->ppu->isWriting = true;
     GetByteForAddressMode(mode, addrModeResult);
+    addrModeResult->value = registers.y;
     core->ppu->incrementV = true;
     core->ppu->isWriting = false;
     AdvanceCyclesForAddressMode(opcode, mode, false, false, false);

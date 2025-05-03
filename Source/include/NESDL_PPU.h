@@ -106,6 +106,7 @@ public:
     uint32_t GetColor(uint16_t pattern, uint32_t palette, uint8_t pixelIndex);
     uint8_t GetPatternBits(uint16_t pattern, uint8_t pixelIndex);
     void PreprocessPPUForReadInstructionTiming(uint8_t instructionPPUTime);
+    void PreprocessPPUForWriteInstructionTiming(uint8_t instructionPPUTime, uint8_t writeValue);
     void UpdateNTFrameData();
 
     PPURegisters registers;
@@ -147,4 +148,5 @@ private:
 
     bool disregardVBL;
     bool disregardNMI;
+    bool specialNMI;
 };

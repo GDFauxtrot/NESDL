@@ -646,8 +646,9 @@ void NESDL_PPU::HandleProcessVBlankScanline()
             {
                 registers.status |= PPUSTATUS_VBLANK;
             }
-            if (!disregardNMI && (registers.ctrl & PPUCTRL_NMIENABLE) != 0x00)
+            if (specialNMI || (!disregardNMI && (registers.ctrl & PPUCTRL_NMIENABLE) != 0x00))
             {
+                specialNMI = false;
                 // Also triggers an NMI (VBlank NMI)
                 core->cpu->nmi = true;
 				nmiFiredAt = elapsedCycles;
@@ -769,6 +770,32 @@ void NESDL_PPU::PreprocessPPUForReadInstructionTiming(uint8_t instructionPPUTime
     }
 }
 
+void NESDL_PPU::PreprocessPPUForWriteInstructionTiming(uint8_t instructionPPUTime, uint8_t writeValue)
+{
+    uint32_t cyclesThisFrame = (currentScanline * 341) + currentScanlineCycle;
+    uint32_t cyclesAfterInstruction = cyclesThisFrame + instructionPPUTime;
+    uint32_t vblTarget = ((241 * 341) + 3); // (241,3) (Vblank dot 3)
+    uint32_t clearTarget = ((261 * 341) + 0); // (261,0) (Prerender scanline dot 0)
+
+    if (writeValue & PPUCTRL_NMIENABLE)
+    {
+        // If we're writing to PPUCTRL NMI flag as VBL clear is about to occur, we need to
+        // inhibit the NMI
+        if (cyclesThisFrame < clearTarget && cyclesAfterInstruction >= clearTarget)
+        {
+            disregardNMI = true;
+        }
+    }
+    else
+    {
+        // If we're clearing PPUCTRL NMI as VBL occurs, we need to ensure it happens
+        if (cyclesThisFrame < vblTarget && cyclesAfterInstruction >= vblTarget)
+        {
+            specialNMI = true;
+        }
+    }
+}
+
 void NESDL_PPU::UpdateNTFrameData()
 {
     memset(ntFrameData, 0x00, sizeof(ntFrameData));
@@ -813,9 +840,13 @@ void NESDL_PPU::WriteToRegister(uint16_t registerAddr, uint8_t data)
             // If NMI flag is flipped from 0 to 1 and PPUSTATUS VBL flag is set, we trigger an NMI immediately
             if ((registers.status & PPUSTATUS_VBLANK) != 0x00 && (registers.ctrl & PPUCTRL_NMIENABLE) == 0x00 && (data & PPUCTRL_NMIENABLE) != 0x00)
             {
-                core->cpu->nmi = true;
-                core->cpu->delayNMI = true;
-                nmiFiredAt = elapsedCycles;
+                if (!disregardNMI)
+                {
+                    core->cpu->nmi = true;
+                    core->cpu->delayNMI = true;
+                    nmiFiredAt = elapsedCycles;
+                }
+                disregardNMI = false;
             }
             registers.ctrl = data;
             // Write nametable bits to register t
