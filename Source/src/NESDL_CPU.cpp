@@ -51,18 +51,6 @@ void NESDL_CPU::Update(uint32_t ppuCycles)
 {
     while (ppuCycleCounter >= 0)
     {
-        /*
-        // Handle NMI/IRQ/DMA
-        //if (nmi && !delayNMI)
-        if (nmi)
-        {
-            nmi = false;
-            irq = false;
-            EvaluateNintendulatorDebug();
-            NMI();
-            nextInstructionPPUCycles = GetCyclesForNextInstruction() * 3;
-        }
-        */
         if (delayedDMA)
         {
             delayedDMA = false;
@@ -77,8 +65,8 @@ void NESDL_CPU::Update(uint32_t ppuCycles)
                 delayedDMA = true;
             }
             
-            // Hack - we can predict a VBL occuring during this instruction, just... flip it on,
-            // for timing accuracy purposes pls
+            // Hack - we can predict a VBL occuring during this instruction, since CPU runs instructions as a whole
+            // but PPU timing for VBL/NMI is more granular than this
             // GetCyclesForNextInstruction prepped our addrModeResult address, we just need to check it
             if (addrModeResult->address >= 0x2000)
             {
@@ -94,8 +82,8 @@ void NESDL_CPU::Update(uint32_t ppuCycles)
             // Debug Nintendulator format
             // printf("\n%s", DebugMakeCurrentStateLine().c_str());
 
-            bool wasIRQFiredInTime = core->ppu->elapsedCycles - 2 >= core->ppu->nmiFiredAt;
-            if (nmi && !delayNMI && wasIRQFiredInTime)
+            bool wasNMIFiredInTime = core->ppu->elapsedCycles - 3 >= core->ppu->nmiFiredAt;
+            if (nmi && !delayNMI && wasNMIFiredInTime)
             {
                 irq = false;
                 nmi = false;
@@ -116,13 +104,11 @@ void NESDL_CPU::Update(uint32_t ppuCycles)
             {
                 nmiFired = false;
                 NMI();
-                ppuCycleCounter = -21; // 7 cycles * 3
             }
             else if (irqFired)
             {
                 irqFired = false;
                 IRQ();
-                ppuCycleCounter = -21; // 7 cycles * 3
             }
             else
             {
@@ -130,6 +116,7 @@ void NESDL_CPU::Update(uint32_t ppuCycles)
                 RunNextInstruction();
             }
 
+            // Handle IRQ line pulled low after instruction (next instruction may be interrupted)
             if (irq)
             {
                 bool wasIRQFiredInTime = core->ppu->elapsedCycles + ppuCyclesElapsed - 3 >= core->ppu->irqFiredAt;
@@ -139,27 +126,19 @@ void NESDL_CPU::Update(uint32_t ppuCycles)
                 {
                     irq = false;
                     irqFired = true;
-                    //elapsedCycles = prevElapsedCycles;
                 }
             }
 
+            // Set P register after IRQ check (this timing is important for IRQ accuracy)
             if (iFlagReady)
             {
                 iFlagReady = false;
                 registers.p = iFlagNextSetState;
             }
 
-            //else
-            {
-                // Figure out how long our new next instruction will take
-                nextInstructionPPUCycles = GetCyclesForNextInstruction() * 3;
-            }
-            if (nintendulatorDebugging)
-            {
-                // Check next instruction time against next Nintendulator line
-                // We can catch an inconsistency before it happens and debug more thoroughly!
-            }
-            
+            // Figure out how long our new next instruction will take
+            nextInstructionPPUCycles = GetCyclesForNextInstruction() * 3;
+
             wasLastInstructionAMapperWrite = didMapperWrite;
             didMapperWrite = false;
         }
@@ -1024,15 +1003,6 @@ void NESDL_CPU::OP_JMP(uint8_t opcode, bool indirect)
         AdvanceCyclesForAddressMode(opcode, AddrMode::IMPLICIT, false, false, false);
     }
     registers.pc = addr;
-    
-    // HACK - in Nintendulator, I've seen an NMI occur AFTER a JMP coinciding at (241,2) on the PPU.
-    // I've been led to assume that the NMI trips on (241,1) and waits for the current instruction
-    // to finish, so I'm not sure why JMP runs first in this very specific instance.
-    // But for accuracy I'd like to match this?
-    if (core->ppu->currentScanlineCycle == 334)
-    {
-        //delayNMI = true;
-    }
 }
 
 void NESDL_CPU::OP_JSR(uint8_t opcode)
@@ -1119,6 +1089,10 @@ void NESDL_CPU::OP_LSR(uint8_t opcode)
 void NESDL_CPU::OP_NOP(uint8_t opcode)
 {
     AddrMode mode = CPU_ADDRMODES[opcode];
+
+    // Special case for nop - need to clear AddrModeResult values
+    addrModeResult->address = 0;
+    addrModeResult->value = 0;
 
     // nop nop
     AdvanceCyclesForAddressMode(opcode, mode, false, false, false);
@@ -1440,7 +1414,7 @@ void NESDL_CPU::NMI()
     
     // Advance 7 cycles
     elapsedCycles += 7;
-    ppuCycleCounter -= 21;
+    ppuCycleCounter = -21; // 7 cycles * 3
 }
 
 void NESDL_CPU::IRQ()
@@ -1463,7 +1437,7 @@ void NESDL_CPU::IRQ()
 
     // Advance 7 cycles
     elapsedCycles += 7;
-    //ppuCycleCounter -= 21;
+    ppuCycleCounter = -21; // 7 cycles * 3
 }
 
 void NESDL_CPU::HaltCPUForDMAWrite()
@@ -1550,14 +1524,14 @@ string NESDL_CPU::DebugMakeCurrentStateLine()
 
     AddrMode nextInstructionMode = CPU_ADDRMODES[opcode];
 
-    // Nintendulator is particular about reads to some addresses like PPU and controller
-    // the "actual" value isn't retrieved, but the underlying bytes in RAM. I've never seen it not be 0xFF
+    // Nintendulator is particular about reads to some addresses like PPU, controller & some cartridge
+    // the "actual" value isn't retrieved, but some underlying bytes in RAM. I've never seen it not be 0xFF
     if (nextInstructionMode == AddrMode::ABSOLUTEADDR ||
         nextInstructionMode == AddrMode::ABSOLUTEX ||
         nextInstructionMode == AddrMode::ABSOLUTEY)
     {
         uint16_t addr = ((uint16_t)param1 << 8) | param0;
-        if (addr >= 0x2000 && addr < 0x4020)
+        if ((addr >= 0x2000 && addr < 0x8000))
         {
             readValue = 0xFF;
         }

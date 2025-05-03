@@ -715,87 +715,38 @@ void NESDL_PPU::HandleProcessVBlankScanline()
 
 void NESDL_PPU::PreprocessPPUForReadInstructionTiming(uint8_t instructionPPUTime)
 {
-	// We mostly care about cycles after instruction because the effective read
-	// occurs on the last CPU cycle for most instructions (VERY important for timing)
-	// https://www.nesdev.org/wiki/PPU_frame_timing#VBL_Flag_Timing
-	// https://www.nesdev.org/6502_cpu.txt
+    // We mostly care about cycles after instruction because the effective read
+    // occurs on the last CPU cycle for most instructions (VERY important for timing)
+    // https://www.nesdev.org/wiki/PPU_frame_timing#VBL_Flag_Timing
+    // https://www.nesdev.org/6502_cpu.txt
 
     uint32_t cyclesThisFrame = (currentScanline * 341) + currentScanlineCycle;
     uint32_t cyclesAfterInstruction = cyclesThisFrame + instructionPPUTime;
-	uint32_t vblTarget = ((241 * 341) + 1); // (241,1) (Vblank dot 1)
-	uint32_t clearTarget = ((261 * 341) + 1); // (261,1) (Prerender scanline dot 1)
+    uint32_t vblTarget = ((241 * 341) + 1); // (241,1) (Vblank dot 1)
+    uint32_t clearTarget = ((261 * 341) + 1); // (261,1) (Prerender scanline dot 1)
 
-	if (!disregardVBL) // Only run this once, can't run again this vblank
-	{
-		// Extra-specific timing thing - if we're reading ON (241,1), the PPU hasn't run a step yet in the emulator. So let's just... VBL
-		if (cyclesThisFrame == vblTarget)
-		{
-			registers.status |= PPUSTATUS_VBLANK;
-			disregardVBL = true;
-			disregardNMI = false;
-		}
-
-		// If instruction goes over vblank, set VBL/NMI ignores based on certain timings (thank you NESDEV)
-		if (cyclesThisFrame < vblTarget && cyclesAfterInstruction >= (vblTarget - 1))
-		{
-			// 1) Reading target-1 results in flag clear, no VBL, no NMI
-			if (cyclesAfterInstruction == vblTarget - 1)
-			{
-				registers.status &= ~PPUSTATUS_VBLANK;
-				disregardVBL = true;
-				disregardNMI = true;
-			}
-			// 2) Reading target or target+1 results in VBL set, but no NMI
-			else if (cyclesAfterInstruction == vblTarget || cyclesAfterInstruction == vblTarget + 1)
-			{
-				registers.status |= PPUSTATUS_VBLANK;
-				disregardVBL = true;
-				disregardNMI = true;
-			}
-			// Reading 2+ frames around VBL results in normal behavior
-			else
-			{
-				registers.status |= PPUSTATUS_VBLANK;
-				disregardVBL = true;
-				disregardNMI = false;
-			}
-		}
-
-		// Another edge case - we crossed over (261,1) on read, so by this point, PPUSTATUS flags should be cleared
-		else if (cyclesThisFrame < clearTarget && cyclesAfterInstruction >= clearTarget)
-		{
-			registers.status &= 0x1F;
-		}
-	}
-
-	/*
-    uint32_t setTarget = ((241 * 341) + 1);
-    uint32_t clearTarget = ((261 * 341) + 1);
-    
-    // This VBL preprocessor is mainly to handle the case where we LDA 0x2002 at the end of scanline 240,
-    // when the timing is most crucial (VBL AND NMI), as well as clearing on scanline 261.
-    
-    if (!disregardVBL)
+    if (!disregardVBL) // Only run this once, can't run again this vblank
     {
-        // Extra-specific timing thing - if we're reading ON (241,1), the PPU hasn't run a step yet. So let's just... VBL
-        if (cyclesThisFrame == setTarget)
+        // Extra-specific timing thing - if we're reading ON (241,1), the PPU hasn't run a step yet in the emulator. So let's just... VBL
+        if (cyclesThisFrame == vblTarget)
         {
             registers.status |= PPUSTATUS_VBLANK;
             disregardVBL = true;
+            disregardNMI = false;
         }
-        if (cyclesThisFrame < setTarget && cyclesAfterInstruction >= (setTarget-1))
+
+        // If instruction goes over vblank, set VBL/NMI ignores based on certain timings (thank you NESDEV)
+        if (cyclesThisFrame < vblTarget && cyclesAfterInstruction >= (vblTarget - 1))
         {
-            // Some weird VBL race conditions (thank you NESDEV):
-            
-            // 1) Reading target-1 results in no VBL, no NMI
-            if (cyclesAfterInstruction == setTarget-1)
+            // 1) Reading target-1 results in flag clear, no VBL, no NMI
+            if (cyclesAfterInstruction == vblTarget - 1)
             {
                 registers.status &= ~PPUSTATUS_VBLANK;
                 disregardVBL = true;
                 disregardNMI = true;
             }
-            // 2) Reading target or target+1 results in a VBL but no NMI
-            else if (cyclesAfterInstruction == setTarget || cyclesAfterInstruction == setTarget+1)
+            // 2) Reading target or target+1 results in VBL set, but no NMI
+            else if (cyclesAfterInstruction == vblTarget || cyclesAfterInstruction == vblTarget + 1)
             {
                 registers.status |= PPUSTATUS_VBLANK;
                 disregardVBL = true;
@@ -809,13 +760,13 @@ void NESDL_PPU::PreprocessPPUForReadInstructionTiming(uint8_t instructionPPUTime
                 disregardNMI = false;
             }
         }
-        // Another edge case - we crossed over (261,1) on read, so by this point, the VBL flag should be cleared (among others)
+
+        // Another edge case - we crossed over (261,1) on read, so by this point, PPUSTATUS flags should be cleared
         else if (cyclesThisFrame < clearTarget && cyclesAfterInstruction >= clearTarget)
         {
             registers.status &= 0x1F;
         }
     }
-	*/
 }
 
 void NESDL_PPU::UpdateNTFrameData()
