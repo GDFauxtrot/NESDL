@@ -86,6 +86,7 @@ void NESDL_CPU::Update(uint32_t ppuCycles)
             // Debug Nintendulator format
             // printf("\n%s", DebugMakeCurrentStateLine().c_str());
 
+            // NMI - when fired between instructions, ensure we trigger before the next instruction runs
             bool wasNMIFiredInTime = core->ppu->elapsedCycles - 2 >= core->ppu->nmiFiredAt;
             if (nmi && !delayNMI && wasNMIFiredInTime)
             {
@@ -95,8 +96,8 @@ void NESDL_CPU::Update(uint32_t ppuCycles)
             }
             delayNMI = false;
 
-            // HACK for IRQ timing - PPU IRQ goes low JUST before CPU opcode fetch happens, this simulates that
-            bool wasIRQFiredExactly = core->ppu->elapsedCycles - 3 == core->ppu->irqFiredAt;
+            // Same goes for IRQ
+            bool wasIRQFiredExactly = core->ppu->elapsedCycles - 3 >= core->ppu->irqFiredAt;
             if (irq && wasIRQFiredExactly && (registers.p & PSTATUS_INTERRUPTDISABLE) == 0)
             {
                 irq = false;
@@ -121,6 +122,7 @@ void NESDL_CPU::Update(uint32_t ppuCycles)
             }
 
             // Handle IRQ line pulled low after instruction (next instruction may be interrupted)
+            // TODO is this still necessary? There's another IRQ check above before next instruction even runs
             if (irq)
             {
                 bool wasIRQFiredInTime = core->ppu->elapsedCycles + ppuCyclesElapsed - 3 >= core->ppu->irqFiredAt;

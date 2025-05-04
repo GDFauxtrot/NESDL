@@ -694,9 +694,6 @@ void NESDL_PPU::HandleProcessVBlankScanline()
         {
             if (isRenderingEnabled)
             {
-                // "tile data for the sprites on the next scanline are fetched here"
-                // (we don't need to do this, as far as I'm aware)
-                
                 // Special case for pre-render scanline: reset vertical scroll (repeatedly)
                 if (currentScanlineCycle >= 280 && currentScanlineCycle <= 304)
                 {
@@ -706,10 +703,36 @@ void NESDL_PPU::HandleProcessVBlankScanline()
         }
         else if (currentScanlineCycle < 337)
         {
+            // Tile data for the sprites on the next scanline begin fetching here
+            // (Important to do so we're not offset by 2 tiles on the first line)
+
+            if ((registers.mask & PPUMASK_BGENABLE) != 0x00)
+            {
+                FetchAndStoreTile(pixelInFetchCycle);
+
+                // On the last tile fetch cycle, store the loaded tile data and increment V register
+                if (pixelInFetchCycle == 7)
+                {
+                    tileBuffer[1] = tileBuffer[0];
+                    tileBuffer[0] = tileFetch;
+
+                    // Coarse X increment (wraps horizontal scroll, technically runs 1 cycle sooner?)
+                    // https://www.nesdev.org/wiki/PPU_scrolling#Wrapping_around
+                    if ((registers.v & 0x001F) == 31)   // if coarse X == 31
+                    {
+                        registers.v &= ~0x001F;         // coarse X = 0
+                        registers.v ^= 0x0400;          // switch horizontal nametable
+                    }
+                    else
+                    {
+                        registers.v += 1;               // increment coarse X
+                    }
+                }
+            }
         }
         else if (currentScanlineCycle < 341)
         {
-            // Two NT bytes are fetched but is really not necessary (except for maper MMC5, we can write a special case in for that)
+            // Two NT bytes are fetched but is really not necessary (except for MMC5, we can write a special case in for that)
         }
     }
 }
