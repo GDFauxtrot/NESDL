@@ -9,73 +9,42 @@ void NESDL_APU::Init(NESDL_Core* c, NESDL_SDL* s)
     
     sequencer.steps = 4;
     counters.noiseLFSR = 1; // Load up LFSR with a bit set for XOR to work off of
+
+    counters.sequencerIndex = 0;
+    counters.sequencerPPUCounter = 0;
+    counters.sequencerNextFrameCycles = 0;
+    counters.sequencerNextFrameCycles = 22371;
+}
+
+void NESDL_APU::Reset()
+{
+    status.square1Enable = false;
+    status.square2Enable = false;
+    status.triEnable = false;
+    status.noiseEnable = false;
+    status.dmcEnable = false;
+    status.dmcInterrupt = false;
+    counters.square1Length = 0;
+    counters.square2Length = 0;
+    counters.triLength = 0;
+    counters.noiseLength = 0;
+    counters.dmcBytesLeft = 0;
 }
 
 void NESDL_APU::Update(uint32_t ppuCycles)
 {
     // Update cycle counters (used to detect when to update values - APU sequencer and generators)
     ppuElapsedCycles += ppuCycles;
-    counters.sequencerPPUCounter += ppuCycles*2;
+    counters.sequencerPPUCounter += ppuCycles;
     
-    // APU sequencer updates happens at 240hz
-    // This equates to ~22372.5 PPU cycles
-    bool doSequencerUpdate = false;
-    if (counters.sequencerPPUCounter >= 44745)
-    {
-        counters.sequencerPPUCounter -= 44745;
-        doSequencerUpdate = true;
-    }
     // CPU/APU update flags
     bool doCPUUpdate = ppuElapsedCycles % 3 == 0;
-    bool doAPUUpdate = ppuElapsedCycles % 6 == 0;
-    
-    // Sequencer update - update envelopes, sweep, length counters and IRQ
-    if (doCPUUpdate && counters.sequencerResetDelay > 0)
-    {
-        if (--counters.sequencerResetDelay == 0)
-        {
-            counters.sequencerIndex = 0;
-            counters.sequencerPPUCounter = 0;
-            if (sequencer.steps == 5)
-            {
-                SequencerUpdateEL();
-                SequencerUpdateLS();
-            }
-        }
-    }
-    if (doSequencerUpdate)
-    {
-        uint8_t step = counters.sequencerIndex;
-        
-        // Update envelope & linear counters (except on 5-step, step 3)
-        if (!(sequencer.steps == 5 && step == 3))
-        {
-            SequencerUpdateEL();
-        }
-        
-        // Update length & sweeps (4-step odd steps or 5-step on 1 and 4)
-        bool updateLengthSweeps = sequencer.steps == 4 && (step % 2) == 1;
-        updateLengthSweeps |= sequencer.steps == 5 && (step == 1 || step == 4);
-        
-        if (updateLengthSweeps)
-        {
-            SequencerUpdateLS();
-        }
-        
-        // Update IRQ on 4-step, step 3
-        if (!sequencer.disableIRQ && sequencer.steps == 4 && step == 3)
-        {
-            
-        }
-        
-        // Advance sequencer step index
-        if (counters.sequencerIndex++ == sequencer.steps)
-        {
-            counters.sequencerIndex = 0;
-        }
-    }
-    
-    // APU update - Update Square channels
+    bool doAPUUpdate = ppuElapsedCycles % 6 == 3;
+
+
+    UpdateAPUFrameCounter();
+
+    // APU clock - Square 1/2, Noise
     if (doAPUUpdate)
     {
         // Square 1/2
@@ -113,8 +82,25 @@ void NESDL_APU::Update(uint32_t ppuCycles)
                 counters.square2WaveTimer--;
             }
         }
+
+        // Noise
+        if (counters.noiseTimer == 0)
+        {
+            counters.noiseTimer = counters.noiseTimerPeriod;
+            // Select bit 6 if mode is set, otherwise bit 1
+            // (Pre-shift left to bit 14)
+            uint16_t xorBit = noise.mode ? (counters.noiseLFSR & 0x40) << 8 : (counters.noiseLFSR & 0x02) << 13;
+            uint16_t feedbackBit = ((counters.noiseLFSR & 0x01) << 14) ^ xorBit;
+            // Shift register right one and slot our bit into 14 (bit 15 is not used)
+            counters.noiseLFSR = (counters.noiseLFSR >> 1) | (feedbackBit & 0x4000);
+        }
+        else
+        {
+            counters.noiseTimer--;
+        }
     }
-    // Triangle, Noise and DMC updates on CPU clock instead of APU)
+
+    // CPU clock - Triangle channel updates (& DMC behavior)
     if (doCPUUpdate)
     {
         // On real hardware, the triangle channel has no limit.
@@ -137,39 +123,12 @@ void NESDL_APU::Update(uint32_t ppuCycles)
                 counters.triWaveTimer--;
             }
         }
-        
-        // Noise
-        if (counters.noiseTimer == 0)
-        {
-            counters.noiseTimer = counters.noiseTimerPeriod;
-            // Select bit 6 if mode is set, otherwise bit 1
-            // (Pre-shift left to bit 14)
-            uint16_t xorBit = noise.mode ? (counters.noiseLFSR & 0x40) << 8 : (counters.noiseLFSR & 0x02) << 13;
-            uint16_t feedbackBit = ((counters.noiseLFSR & 0x01) << 14) ^ xorBit;
-            // Shift register right one and slot our bit into 14 (bit 15 is not used)
-            counters.noiseLFSR = (counters.noiseLFSR >> 1) | (feedbackBit & 0x4000);
-        }
-        else
-        {
-            counters.noiseTimer--;
-        }
-        
+
         // DMC
-        if (counters.dmcTimer == 0 && false) // DISABLED
+        if (counters.dmcTimer == 0)
         {
-            counters.dmcTimer = NESDL_DMC_RATE[dmc.rate]/4;
-            
-            // Clock - go through current buffer
-            if (counters.dmcBufferBitsRemaining == 0)
-            {
-                counters.dmcBufferBitsRemaining = 8;
-                counters.dmcIsSilent = (counters.dmcSampleBuffer == 0x00);
-            }
-            else
-            {
-                counters.dmcBufferBitsRemaining--;
-            }
-            
+            counters.dmcTimer = NESDL_DMC_RATE[dmc.rate];
+
             if (!counters.dmcIsSilent)
             {
                 int8_t value = (counters.dmcSampleBuffer & 0x01) ? 2 : -2;
@@ -178,19 +137,26 @@ void NESDL_APU::Update(uint32_t ppuCycles)
                 {
                     counters.dmcOutputSample += value;
                 }
-                
+
                 counters.dmcSampleBuffer = counters.dmcSampleBuffer >> 1;
             }
-            
+
             // Buffer is empty - we should reload ASAP
-            if (counters.dmcBufferBitsRemaining == 0 && counters.dmcBytesLeft > 0)
+            if (counters.dmcBufferBitsRemaining > 0)
             {
+                counters.dmcBufferBitsRemaining--;
+            }
+            else if (counters.dmcBufferBitsRemaining == 0 && counters.dmcBytesLeft > 0)
+            {
+                counters.dmcBufferBitsRemaining = 7;
+                //counters.dmcIsSilent = (counters.dmcSampleBuffer == 0x00);
+
                 core->cpu->HaltCPUForDMC();
-                
+
                 // Get next byte sample to play!
                 counters.dmcSampleBuffer = core->ram->ReadByte(counters.dmcAddr);
                 counters.dmcIsSilent = false;
-                
+
                 // Increase address
                 if (counters.dmcAddr == 0xFFFF)
                 {
@@ -200,18 +166,20 @@ void NESDL_APU::Update(uint32_t ppuCycles)
                 {
                     counters.dmcAddr++;
                 }
-                
-                // Decrease bytes left
+
+                // Decrease bytes left (output cycle ends)
                 if (--counters.dmcBytesLeft == 0)
                 {
                     if (dmc.loop)
                     {
-                        counters.dmcAddr = 0xC000 | (dmc.sampleAddr << 6);
+                        counters.dmcAddr = 0xC000 + (dmc.sampleAddr << 6);
                         counters.dmcBytesLeft = (dmc.sampleLength << 4) + 1;
                     }
                     if (dmc.irqEnabled)
                     {
-                        // TODO DMC IRQ
+                        counters.dmcIsSilent = true;
+                        core->cpu->irq = true;
+                        core->ppu->irqFiredAt = core->ppu->elapsedCycles;
                     }
                 }
             }
@@ -231,10 +199,11 @@ void NESDL_APU::Update(uint32_t ppuCycles)
     
     // CPU update - entire sample production is based on a specific calculation (CPU clock / sample rate)
     // So we must update only on very specific intervals derives from CPU timing
-    if (doCPUUpdate)
-    {
-        cpuClockSampleTimer += 1.0;
-    }
+    cpuClockSampleTimer += (1.0 / 3.0);
+    //if (doCPUUpdate)
+    //{
+    //    cpuClockSampleTimer += 1.0;
+    //}
     if (cpuClockSampleTimer >= cpuClocksPerSample)
     {
         cpuClockSampleTimer -= cpuClocksPerSample;
@@ -254,19 +223,19 @@ void NESDL_APU::Update(uint32_t ppuCycles)
         // Multiply channels by their volume
         if (square1.constant)
         {
-            s1 *= ((float)square1.volume / 15);
+            s1 *= (square1.volume / 15.0f);
         }
         else
         {
-            s1 *= ((float)square1Envelope.decay / 15);
+            s1 *= (square1Envelope.decay / 15.0f);
         }
         if (square2.constant)
         {
-            s2 *= ((float)square2.volume / 15);
+            s2 *= (square2.volume / 15.0f);
         }
         else
         {
-            s2 *= ((float)square2Envelope.decay / 15);
+            s2 *= (square2Envelope.decay / 15.0f);
         }
         
         // Triangle has no volume - skip
@@ -306,6 +275,77 @@ void NESDL_APU::Update(uint32_t ppuCycles)
         
         // Send the sample off for playback
         sdlCtx->WriteNextAPUSignal(output);
+    }
+}
+
+void NESDL_APU::UpdateAPUFrameCounter()
+{
+    bool newStep = false;
+    uint8_t step = counters.sequencerIndex;
+
+    // Detect if we "step" or not, and advance next step counter if so
+    if (counters.sequencerPPUCounter > counters.sequencerNextFrameCycles)
+    {
+        newStep = true;
+        counters.sequencerIndex++;
+
+        // Increment, wrap sequencer index if necessary
+        if (counters.sequencerIndex == sequencer.steps)
+        {
+            counters.sequencerIndex = 0;
+            counters.sequencerPPUCounter = 0;
+        }
+        // Next step's PPU cycle counter
+        switch (counters.sequencerIndex)
+        {
+        case 0:
+            counters.sequencerNextFrameCycles = 22371; // 3728.5 APU cycles
+            break;
+        case 1:
+            counters.sequencerNextFrameCycles = 44739; // 7456.5 APU cycles
+            break;
+        case 2:
+            counters.sequencerNextFrameCycles = 67113; // 11185.5 APU cycles
+            break;
+        case 3:
+            counters.sequencerNextFrameCycles = 89487; // 14914.5 APU cycles
+            break;
+        case 4:
+            counters.sequencerNextFrameCycles = 111843; // 18640.5 APU cycles
+            break;
+        default:
+            // Uhhhhhhhh
+            break;
+        }
+    }
+
+    // We've stepped through our sequencer, perform the necessary updates
+    if (newStep)
+    {
+        if (sequencer.steps == 4)
+        {
+            SequencerUpdateEL();
+            if (step == 1 || step == 3)
+            {
+                SequencerUpdateLS();
+            }
+            if (step == 3 && dmc.irqEnabled)
+            {
+                core->cpu->irq = true;
+                core->ppu->irqFiredAt = core->ppu->elapsedCycles;
+            }
+        }
+        else // 5-step sequence
+        {
+            if (step != 3)
+            {
+                SequencerUpdateEL();
+            }
+            if (step == 1 || step == 4)
+            {
+                SequencerUpdateLS();
+            }
+        }
     }
 }
 
@@ -597,7 +637,7 @@ void NESDL_APU::WriteByte(uint16_t addr, uint8_t data)
             UpdateSweepTargetTimer(1);
             break;
         case 0x4003:
-            square1.timer = ((data & 0x07) << 8) | (square1.timer & 0x00FF);
+            square1.timer = (((uint16_t)data & 0x07) << 8) | (square1.timer & 0x00FF);
             counters.square1CurrentTimer = square1.timer;
             UpdateSweepTargetTimer(1);
             square1.length = data >> 3;
@@ -627,7 +667,7 @@ void NESDL_APU::WriteByte(uint16_t addr, uint8_t data)
             UpdateSweepTargetTimer(2);
             break;
         case 0x4007:
-            square2.timer = ((data & 0x07) << 8) | (square2.timer & 0x00FF);
+            square2.timer = (((uint16_t)data & 0x07) << 8) | (square2.timer & 0x00FF);
             counters.square2CurrentTimer = square2.timer;
             UpdateSweepTargetTimer(2);
             square2.length = data >> 3;
@@ -669,10 +709,10 @@ void NESDL_APU::WriteByte(uint16_t addr, uint8_t data)
             break;
         // DMC
         case 0x4010:
-            dmc.rate = data & 0x07;
+            dmc.rate = data & 0x0F;
             dmc.loop = data & 0x40;
             dmc.irqEnabled = data & 0x80;
-//            counters.dmcTimer = NESDL_DMC_RATE[dmc.rate];
+            counters.dmcTimer = NESDL_DMC_RATE[dmc.rate];
             break;
         case 0x4011:
             dmc.directLoad = data & 0x7F;
@@ -680,11 +720,11 @@ void NESDL_APU::WriteByte(uint16_t addr, uint8_t data)
             break;
         case 0x4012:
             dmc.sampleAddr = data;
-            counters.dmcAddr = 0xC000 | (data << 6);
+            counters.dmcAddr = 0xC000 + (dmc.sampleAddr << 6);
             break;
         case 0x4013:
             dmc.sampleLength = data;
-            counters.dmcBytesLeft = (data << 4) + 1;
+            counters.dmcBytesLeft = ((uint16_t)data << 4) + 1;
             break;
         // Status
         case 0x4015:
@@ -719,7 +759,7 @@ void NESDL_APU::WriteByte(uint16_t addr, uint8_t data)
             {
                 if (dmc.sampleLength > 0)
                 {
-                    counters.dmcBytesLeft = (data << 4) + 1;
+                    counters.dmcBytesLeft = (dmc.sampleLength << 4) + 1;
                 }
             }
             break;
@@ -727,9 +767,6 @@ void NESDL_APU::WriteByte(uint16_t addr, uint8_t data)
         case 0x4017:
             sequencer.disableIRQ = data & 0x40;
             sequencer.steps = (data & 0x80) ? 5 : 4;
-            // Side-effect - update CPU IRQ, update sequencer state (peculiar)
-            counters.sequencerResetDelay = ((ppuElapsedCycles/3) % 2) == 1 ? 2 : 3;
-            // TODO set CPU IRQ flag value
             break;
     }
 }

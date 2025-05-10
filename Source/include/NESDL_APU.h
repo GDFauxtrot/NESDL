@@ -43,7 +43,7 @@ struct APUNoise
 struct APUDMC
 {
     // 0x4010-0x4013 - DMC
-    uint16_t    rate;           // 0x4010
+    uint8_t     rate;           // 0x4010
     bool        loop;
     bool        irqEnabled;
     uint16_t    directLoad;     // 0x4011
@@ -124,19 +124,21 @@ struct APUCounters
     uint8_t     dmcOutputSample; // 7-bit
     
     // Sequencer
-    uint16_t    sequencerPPUCounter;
     uint8_t     sequencerIndex;
-    uint8_t     sequencerResetDelay;
+    uint32_t    sequencerPPUCounter;
+    uint32_t    sequencerNextFrameCycles;
 };
 
 class NESDL_APU
 {
 public:
     void Init(NESDL_Core* c, NESDL_SDL* s);
+    void Reset();
     void Update(uint32_t ppuCycles);
     uint8_t ReadByte(uint16_t addr);
     void WriteByte(uint16_t addr, uint8_t data);
 private:
+    void UpdateAPUFrameCounter();
     void SequencerUpdateEL();
     void SequencerUpdateLS();
     
@@ -148,7 +150,7 @@ private:
     
     // Frame counters, audio timers
     uint64_t ppuElapsedCycles;
-    double cpuClocksPerSample = (double)1789773 / (double)(APU_SAMPLE_RATE - 1); // -1 to slightly overrun, avoid pops
+    double cpuClocksPerSample = (double)1789773 / (double)(APU_SAMPLE_RATE);
     double cpuClockSampleTimer;
     
     // APU internal counter/timer info

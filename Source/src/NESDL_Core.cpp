@@ -260,6 +260,7 @@ void NESDL_Core::Action_ResetSoft()
 {
     cpu->Reset(false);
     ppu->Reset(false);
+    apu->Reset();
     sdlCtx->UpdateScreenTexture();
 }
 void NESDL_Core::Action_ResetHard()
@@ -267,6 +268,7 @@ void NESDL_Core::Action_ResetHard()
     timeSinceStartup = 0;
     cpu->Reset(true);
     ppu->Reset(true);
+    apu->Reset();
     sdlCtx->UpdateScreenTexture();
 }
 void NESDL_Core::Action_ViewFrameInfo()
