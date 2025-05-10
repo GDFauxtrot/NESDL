@@ -61,7 +61,16 @@ public:
             stringstream ss(data[section][key]);
 
             T out;
-            ss >> out;
+
+            // Need to provide this for string, as the >> operator isn't whitespace-friendly
+            if (std::is_same<T, std::string>::value)
+            {
+                std::getline(ss, out);
+            }
+            else
+            {
+                ss >> out;
+            }
 
             if (ss.fail())
             {
