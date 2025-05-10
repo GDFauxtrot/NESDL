@@ -31,6 +31,8 @@
 - (void) debugShowCPU:(nullable id)sender;
 - (void) debugShowPPU:(nullable id)sender;
 - (void) debugShowNT:(nullable id)sender;
+- (void) debugAttachLog:(nullable id)sender;
+- (void) debugDetachLog:(nullable id)sender;
 @end
 
 @implementation NESDLMac
@@ -100,6 +102,10 @@ NSMenu* AddSubMenuToMenuItem(NSMenuItem* menuItem)
     CreateMenuItemAndAddToMenu(debugMenu, self, @"Step (Frame)", @selector(debugStepFrame:), @"1");
     CreateMenuItemAndAddToMenu(debugMenu, self, @"Step (CPU)", @selector(debugStepCPU:), @"2");
     CreateMenuItemAndAddToMenu(debugMenu, self, @"Step (PPU)", @selector(debugStepPPU:), @"3");
+#ifdef _DEBUG
+    CreateMenuItemAndAddToMenu(debugMenu, self, @"Attach Nintendulator Log...", @selector(debugAttachLog:), @"");
+    CreateMenuItemAndAddToMenu(debugMenu, self, @"Detach Nintendulator Log", @selector(debugDetachLog:), @"");
+#endif
     menuItem = [[NSMenuItem alloc] init];
     [menuItem setSubmenu:debugMenu];
     [[NSApp mainMenu] insertItem:menuItem atIndex:3];
@@ -162,6 +168,12 @@ NSMenu* AddSubMenuToMenuItem(NSMenuItem* menuItem)
 }
 - (void) debugShowNT:(nullable id)sender {
     nesdl.core->Action_DebugShowNT();
+}
+- (void) debugAttachLog:(nullable id)sender {
+    nesdl.core->Action_AttachNintendulatorLog();
+}
+- (void) debugDetachLog:(nullable id)sender {
+    nesdl.core->Action_DetachNintendulatorLog();
 }
 
 @end

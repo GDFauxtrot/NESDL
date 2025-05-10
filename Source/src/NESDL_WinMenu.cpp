@@ -69,8 +69,11 @@ void NESDL_WinMenu::Initialize(SDL_Window* window)
     AppendMenu(debugMenu, MF_STRING, ID_DBUG_STEPFRM, L"Step (Frame)");
     AppendMenu(debugMenu, MF_STRING, ID_DBUG_STEPCPU, L"Step (CPU)");
     AppendMenu(debugMenu, MF_STRING, ID_DBUG_STEPPPU, L"Step (PPU)");
+
+#ifdef _DEBUG
     AppendMenu(debugMenu, MF_STRING, ID_DBUG_NINTLOG, L"Attach Nintendulator Log...");
     AppendMenu(debugMenu, MF_STRING, ID_DBUG_REMVLOG, L"Detach Nintendulator Log");
+#endif
 
     // attach menu bar to the window
     SetMenu(hwnd, mainMenu);

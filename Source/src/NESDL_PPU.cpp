@@ -203,7 +203,7 @@ void NESDL_PPU::HandleProcessVisibleScanline()
                 
                 for (int i = start; i < end; ++i)
                 {
-                    uint16_t currentPixel = (currentScanline * PPU_WIDTH) + currentDrawX;
+                    uint16_t currentPixel = (currentScanline * NESDL_SCREEN_WIDTH) + currentDrawX;
                     // Don't render if we wrote a sprite pixel here, unless the BG tile has priority
                     uint8_t patternBits = GetPatternBits(toRender.pattern, i);
                     bool bgPriority = (frameDataSprite[currentPixel] & 0x80) != 0x00;
@@ -255,7 +255,7 @@ void NESDL_PPU::HandleProcessVisibleScanline()
                     uint8_t i = 0;
                     while (currentDrawX < 256)
                     {
-                        uint16_t currentPixel = (currentScanline * PPU_WIDTH) + currentDrawX;
+                        uint16_t currentPixel = (currentScanline * NESDL_SCREEN_WIDTH) + currentDrawX;
 
                         // Don't render if we wrote a sprite pixel here, unless the BG tile has priority
                         uint8_t patternBits = GetPatternBits(toRender.pattern, i);
@@ -352,7 +352,7 @@ void NESDL_PPU::HandleProcessVisibleScanline()
     else
     {
         // BG rendering is disabled = we should be rendering backdrop instead
-        uint16_t currentPixel = (currentScanline * PPU_WIDTH) + currentScanlineCycle;
+        uint16_t currentPixel = (currentScanline * NESDL_SCREEN_WIDTH) + currentScanlineCycle;
         frameData[currentPixel] = NESDL_PALETTE[paletteData[0]];
     }
     
@@ -372,11 +372,11 @@ void NESDL_PPU::HandleProcessVisibleScanline()
                     continue;
                 }
                 
-                uint16_t currentPixel = (currentScanline * PPU_WIDTH) + currentScanlineCycle;
+                uint16_t currentPixel = (currentScanline * NESDL_SCREEN_WIDTH) + currentScanlineCycle;
                 uint8_t index = (currentScanlineCycle - sprData.startX) % 8;
                 
                 // We're going out of bounds on screen - don't continue rendering
-                if (currentPixel >= (PPU_WIDTH * PPU_HEIGHT))
+                if (currentPixel >= (NESDL_SCREEN_WIDTH * NESDL_SCREEN_HEIGHT))
                 {
                     continue;
                 }

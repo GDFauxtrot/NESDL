@@ -12,10 +12,6 @@ const string NESDL_WINDOW_NAME = "NESDL";
 const string NESDL_VERSION_STR = "0.1.0";
 const string NESDL_VERSIONDATE = "April 16th, 2025";
 
-// PPU
-#define PPU_WIDTH 256
-#define PPU_HEIGHT 240
-
 // Measured in hz
 #define NESDL_MASTER_CLOCK 21477273 // 236.25 MHz / 11, by definition
 #define NESDL_PPU_CLOCK (NESDL_MASTER_CLOCK / 4) // 4 clocks per dot, 3x faster than CPU
