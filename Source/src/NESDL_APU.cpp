@@ -29,6 +29,7 @@ void NESDL_APU::Reset()
     counters.triLength = 0;
     counters.noiseLength = 0;
     counters.dmcBytesLeft = 0;
+    counters.dmcIsSilent = true;
 }
 
 void NESDL_APU::Update(uint32_t ppuCycles)
