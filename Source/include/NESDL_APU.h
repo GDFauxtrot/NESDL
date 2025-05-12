@@ -150,7 +150,7 @@ private:
     
     // Frame counters, audio timers
     uint64_t ppuElapsedCycles;
-    double cpuClocksPerSample = (double)1789773 / (double)(APU_SAMPLE_RATE);
+    double cpuClocksPerSample = (double)1789773 / (double)APU_SAMPLE_RATE;
     double cpuClockSampleTimer;
     
     // APU internal counter/timer info
@@ -158,6 +158,10 @@ private:
     APUEnvelope square1Envelope;
     APUEnvelope square2Envelope;
     APUEnvelope noiseEnvelope;
+
+    // DMC DMA
+    int8_t dmcDMASchedule = -1;
+    uint8_t dmcDMACPUCycles = 0;
     
     // Various APU register data (organized into structs)
     APUSquare square1;

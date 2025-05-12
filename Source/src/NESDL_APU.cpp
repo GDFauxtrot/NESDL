@@ -30,6 +30,8 @@ void NESDL_APU::Reset()
     counters.noiseLength = 0;
     counters.dmcBytesLeft = 0;
     counters.dmcIsSilent = true;
+    dmcDMASchedule = -1;
+    dmcDMACPUCycles = 0;
 }
 
 void NESDL_APU::Update(uint32_t ppuCycles)
@@ -45,7 +47,7 @@ void NESDL_APU::Update(uint32_t ppuCycles)
 
     UpdateAPUFrameCounter();
 
-    // APU clock - Square 1/2, Noise
+    // APU clock - Square 1/2, Noise, DMC DMA
     if (doAPUUpdate)
     {
         // Square 1/2
@@ -98,6 +100,16 @@ void NESDL_APU::Update(uint32_t ppuCycles)
         else
         {
             counters.noiseTimer--;
+        }
+
+        // DMC DMA (load DMA)
+        if (dmcDMASchedule > 0)
+        {
+            if (--dmcDMASchedule == 0)
+            {
+                dmcDMASchedule = -1;
+                core->cpu->HaltCPUForDMC(false);
+            }
         }
     }
 
@@ -152,7 +164,8 @@ void NESDL_APU::Update(uint32_t ppuCycles)
                 counters.dmcBufferBitsRemaining = 7;
                 //counters.dmcIsSilent = (counters.dmcSampleBuffer == 0x00);
 
-                core->cpu->HaltCPUForDMC();
+                // Halt CPU (reload DMA)
+                core->cpu->HaltCPUForDMC(true);
 
                 // Get next byte sample to play!
                 counters.dmcSampleBuffer = core->ram->ReadByte(counters.dmcAddr);
@@ -188,6 +201,11 @@ void NESDL_APU::Update(uint32_t ppuCycles)
         else
         {
             counters.dmcTimer--;
+        }
+        
+        if (dmcDMASchedule >= 0)
+        {
+            dmcDMACPUCycles++;
         }
     }
     
@@ -761,6 +779,12 @@ void NESDL_APU::WriteByte(uint16_t addr, uint8_t data)
                 if (dmc.sampleLength > 0)
                 {
                     counters.dmcBytesLeft = (dmc.sampleLength << 4) + 1;
+                }
+                // If sample buffer is empty, trigger DMC DMA CPU halt
+                if (counters.dmcSampleBuffer == 0)
+                {
+                    dmcDMASchedule = 3;
+                    dmcDMACPUCycles = 0;
                 }
             }
             break;

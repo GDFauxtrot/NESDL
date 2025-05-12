@@ -235,6 +235,11 @@ void NESDL_Mapper_4::WriteByte(uint16_t addr, uint8_t data)
             // (there's a bit of nuance here regarding an "8-bit extension"? we don't need it though)
             // Additionally, R0/R1 ignores first bit to CHR-ROM, the rest write whole byte as normal
 
+            // TODO return to this - bank select on PRG-ROM that clearly goes over the bank count is...
+            // ignored? Upper bits just ignored? I'm not sure about this behavior and it seems
+            // undocumented on nesdev but is absolutely followed in emulators (Nintendulator)
+            // https://gamedev.stackexchange.com/q/200650
+
             switch (bankRegisterMode)
             {
                 case 0:
@@ -256,10 +261,10 @@ void NESDL_Mapper_4::WriteByte(uint16_t addr, uint8_t data)
                     chrROM5Index = data;
                     break;
                 case 6:
-                    prgROM0Index = (data & 0x3F);
+                    prgROM0Index = (data & 0x3F) % prgBanks;
                     break;
                 case 7:
-                    prgROM1Index = (data & 0x3F);
+                    prgROM1Index = (data & 0x3F) % prgBanks;
                     break;
             }
         }

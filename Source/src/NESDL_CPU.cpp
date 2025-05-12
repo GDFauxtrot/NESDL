@@ -1456,9 +1456,10 @@ void NESDL_CPU::HaltCPUForDMAWrite()
     ppuCycleCounter -= delay*3;
 }
 
-void NESDL_CPU::HaltCPUForDMC()
+void NESDL_CPU::HaltCPUForDMC(bool isReload)
 {
-    uint8_t delay = elapsedCycles % 2 == 0 ? 3 : 4;
+    uint8_t delay = 0;
+    delay = elapsedCycles % 2 == 0 ? 4 : 3;
     elapsedCycles += delay;
     ppuCycleCounter -= delay*3;
 }
@@ -1540,7 +1541,7 @@ string NESDL_CPU::DebugMakeCurrentStateLine()
         nextInstructionMode == AddrMode::ABSOLUTEY)
     {
         uint16_t addr = ((uint16_t)param1 << 8) | param0;
-        if ((addr >= 0x2000 && addr < 0x8000))
+        if ((addr >= 0x2000))
         {
             readValue = 0xFF;
         }

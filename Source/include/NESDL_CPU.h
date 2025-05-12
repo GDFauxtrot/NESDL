@@ -219,7 +219,7 @@ public:
     void Update(uint32_t ppuCycles);
     void DidMapperWrite();
     bool IsConsecutiveMapperWrite();
-    void HaltCPUForDMC();
+    void HaltCPUForDMC(bool isReload);
 
     void DebugBindNintendulator(const char* path);
     void DebugUnbindNintendulator();
